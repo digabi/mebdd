@@ -1,0 +1,26 @@
+1 VERSIONINFO
+FILEVERSION 1,0,0,0
+PRODUCTVERSION 1,0,0,0
+{
+ BLOCK "StringFileInfo"
+ {
+  BLOCK "040904E4"
+  {
+   VALUE "Comments", "Requires Admin\000"
+   VALUE "CompanyName", "MEB Finland\000"
+   VALUE "ENY Extra Info", "none\000"
+   VALUE "FileDescription", "mebdd_worker\000"
+   VALUE "FileVersion", "1.0.0.0\000"
+   VALUE "InternalName", "mebdd_worker\000"
+   VALUE "LegalCopyright", "MEB Finland\000"
+   VALUE "LegalTrademarks", "none\000"
+   VALUE "OriginalFilename", "mebdd_worker.exe\000"
+   VALUE "ProductName", "mebdd_worker\000"
+   VALUE "ProductVersion", "1.0.0.0\000"
+  }
+ }
+ BLOCK "VarFileInfo"
+ {
+  VALUE "Translation", 0x0409, 0x04E4
+ }
+}

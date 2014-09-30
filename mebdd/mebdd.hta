@@ -1,0 +1,463 @@
+<head>
+<title>MEB DD 1.1b</title>
+<HTA:APPLICATION 
+     APPLICATIONNAME="MEB DD"
+     SCROLL="yes"
+     SINGLEINSTANCE="yes"
+     WINDOWSTATE="maximize"
+>
+	<style type="text/css">
+		p { font-family: Arial; font-size: 12pt; }
+		h1 { font-family: Arial; font-size: 16pt; }
+		ul { font-family: Arial; font-size: 12pt; }
+		.radio_disk_normal { font-family: Courier; color: black; }
+		.radio_disk_warning { font-family: Courier; color: red; }
+		.file_path { font-family: Courier; }
+		.header { font-family: Arial; font-size: 130%; color: white; }
+	</style>
+</head>
+
+<script language="VBScript">
+	Option Explicit
+	
+	Const HKEY_CURRENT_USER =  &H80000001
+	Const HKEY_LOCAL_MACHINE = &H80000002
+	Const KEY_QUERY_VALUE = &H0001
+
+	Const REG_IMAGE_PATH = "Software\MEB Finland\mebdd"
+	Const REG_IMAGE_KEY = "LastImagePath"
+	Const REG_INSTALL_PATH = "SOFTWARE\MEB Finland\mebdd"
+	Const REG_INSTALL_KEY = "path_mebdd"
+	Const LOCALDATA_PATH = "MEB Finland\mebdd"
+	Const DOWNLOAD_32BIT = "https://digabi.fi/32bit"
+	Const DOWNLOAD_64BIT = "https://digabi.fi/64bit"
+	
+	' NOTE! NOTE! We have to give the FULL PATH for these command-line tools.
+	' Please make sure you change these in case you relocate the utilities.
+	Dim BIN_CURL, BIN_MEBDD_WORKER
+	
+	BIN_CURL = ReadMEBDDInstallationPath() & "\curl.exe"
+	BIN_MEBDD_WORKER = ReadMEBDDInstallationPath() & "\mebdd_worker.exe"
+	
+	Function GetEnvironmentString(strVariableName)
+		Dim objShell
+		Set objShell = CreateObject("WScript.Shell")
+		GetEnvironmentString = objShell.ExpandEnvironmentStrings("%" & strVariableName & "%")
+	End Function
+
+	Function ReadLastImagePath ()
+		Dim oReg, strKeyPath, strValue
+		Set oReg=GetObject("winmgmts:{impersonationLevel=impersonate}!\\.\root\default:StdRegProv")
+		oReg.GetStringValue HKEY_CURRENT_USER,REG_IMAGE_PATH,REG_IMAGE_KEY,strValue
+		ReadLastImagePath = strValue
+	End Function
+	
+	Function WriteLastImagePath (strNewPath)
+		Dim oReg, strKeyPath, strValue
+		Set oReg=GetObject("winmgmts:{impersonationLevel=impersonate}!\\.\root\default:StdRegProv")
+		oReg.CreateKey HKEY_CURRENT_USER, REG_IMAGE_PATH
+		oReg.SetStringValue HKEY_CURRENT_USER, REG_IMAGE_PATH, REG_IMAGE_KEY, strNewPath
+	End Function
+	
+	Function GetLocalImageDirectoryPath ()
+		Dim fso, strDestinationPath
+		
+		strDestinationPath = GetEnvironmentString("LOCALAPPDATA") & "\" & LOCALDATA_PATH & "\"
+		
+		Set fso = CreateObject("Scripting.FileSystemObject") 
+		If (Not fso.FolderExists(strDestinationPath)) Then
+			CreateDirs(strDestinationPath)
+		End If
+		
+		GetLocalImageDirectoryPath = strDestinationPath
+	End Function
+	
+	Function ReadMEBDDInstallationPath ()
+		Dim oReg, strValue, bHasAccessRight
+		Set oReg=GetObject("winmgmts:{impersonationLevel=impersonate}!\\.\root\default:StdRegProv")
+
+		oReg.CheckAccess HKEY_LOCAL_MACHINE, REG_INSTALL_PATH, KEY_QUERY_VALUE, bHasAccessRight
+		
+		If bHasAccessRight = False Then
+			MsgBox "En voi lukea MEBDD-asennushakemiston osoitetta. Asenna ohjelma uudelleen."
+		End If
+		
+		oReg.GetStringValue HKEY_LOCAL_MACHINE,REG_INSTALL_PATH,REG_INSTALL_KEY,strValue
+		ReadMEBDDInstallationPath = strValue
+	End Function
+
+	' http://www.robvanderwoude.com/vbstech_folders_md.php
+	Sub CreateDirs( MyDirName )
+	' This subroutine creates multiple folders like CMD.EXE's internal MD command.
+	' By default VBScript can only create one level of folders at a time (blows
+	' up otherwise!).
+	'
+	' Argument:
+	' MyDirName   [string]   folder(s) to be created, single or
+	'                        multi level, absolute or relative,
+	'                        "d:\folder\subfolder" format or UNC
+	'
+	' Written by Todd Reeves
+	' Modified by Rob van der Woude
+	' http://www.robvanderwoude.com
+
+		Dim arrDirs, i, idxFirst, objFSO, strDir, strDirBuild
+
+		' Create a file system object
+		Set objFSO = CreateObject( "Scripting.FileSystemObject" )
+
+		' Convert relative to absolute path
+		strDir = objFSO.GetAbsolutePathName( MyDirName )
+
+		' Split a multi level path in its "components"
+		arrDirs = Split( strDir, "\" )
+
+		' Check if the absolute path is UNC or not
+		If Left( strDir, 2 ) = "\\" Then
+			strDirBuild = "\\" & arrDirs(2) & "\" & arrDirs(3) & "\"
+			idxFirst    = 4
+		Else
+			strDirBuild = arrDirs(0) & "\"
+			idxFirst    = 1
+		End If
+
+		' Check each (sub)folder and create it if it doesn't exist
+		For i = idxFirst to Ubound( arrDirs )
+			strDirBuild = objFSO.BuildPath( strDirBuild, arrDirs(i) )
+			If Not objFSO.FolderExists( strDirBuild ) Then
+				objFSO.CreateFolder strDirBuild
+			End if
+		Next
+
+		' Release the file system object
+		Set objFSO= Nothing
+	End Sub
+	
+	' http://sogeeky.blogspot.fi/2007/04/vbscript-function-code-to-convert-bytes.html
+	Function ConvertSize(Size)
+		Dim CommaLocate, Suffix
+		
+		Do While InStr(Size,",") 'Remove commas from size
+			CommaLocate = InStr(Size,",")
+			Size = Mid(Size,1,CommaLocate - 1) & _
+				Mid(Size,CommaLocate + 1,Len(Size) - CommaLocate)
+		Loop
+
+		Suffix = " Bytes"
+		If Size >= 1024 Then suffix = " KB"
+		If Size >= 1048576 Then suffix = " MB"
+		If Size >= 1073741824 Then suffix = " GB"
+		If Size >= 1099511627776 Then suffix = " TB"
+
+		Select Case Suffix
+			Case " KB" Size = Round(Size / 1024, 1)
+			Case " MB" Size = Round(Size / 1048576, 1)
+			Case " GB" Size = Round(Size / 1073741824, 1)
+			Case " TB" Size = Round(Size / 1099511627776, 1)
+		End Select
+
+		ConvertSize = Size & Suffix
+	End Function
+
+	Sub PopulateDrives
+		Dim n
+		n = 0
+		
+		' Reset radio buttons
+		objRadioButtonArea.InnerHTML = ""
+		
+		Dim strComputer, objWMIService, colDiskDrives, objDiskDrive, strRadioHTML, strRadioClass
+
+		strComputer = "."
+		Set objWMIService = GetObject("winmgmts:" _    
+			& "{impersonationLevel=impersonate}!\\" & strComputer _
+				& "\root\cimv2")
+		Set colDiskDrives = objWMIService.ExecQuery _    
+			("Select * from Win32_DiskDrive Where MediaType=""Removable Media""")
+		For each objDiskDrive in colDiskDrives
+			n = n + 1
+			
+			strRadioHTML = objRadioButtonArea.InnerHTML
+
+			strRadioClass = "radio_disk_normal"
+			
+			If objDiskDrive.Size > 17179869184 Then
+				' This is too big to a USB thumb drive (bigger than 16 Gb)
+				strRadioClass = "radio_disk_warning"
+			End If
+			
+			strRadioHTML = "<span class=" & strRadioClass & "><input type=checkbox name=formDisk_" & n & " value=" & Chr(34) & objDiskDrive.DeviceID & Chr(34) & " onclick=""CheckSelectedDrive"">" & objDiskDrive.Model & ", " & objDiskDrive.Caption & " (" & ConvertSize(objDiskDrive.Size) & ")</span><br/>"
+			
+			objRadioButtonArea.InnerHTML = objRadioButtonArea.InnerHTML & strRadioHTML
+		Next
+		
+		objRadioButtonArea.InnerHTML = objRadioButtonArea.InnerHTML & "<input type=hidden name=formDisk_length value=" & n & ">"
+		
+		If (n = 0) Then
+			objRadioButtonArea.InnerHTML = objRadioButtonArea.InnerHTML & "<p>Varoitus: USB-muisteja ei löytynyt. Liitä yksi tai useampi USB-muisti tietokoneeseen ja napsauta alla olevaa painiketta.</p>"
+		End If
+		
+		CheckSelectedDrive
+		
+	End Sub
+	
+	Sub ButtonsDisable
+		buttonWriteImage.disabled = True
+		buttonWriteZeroImage.disabled = True
+		buttonPopulateDrives.disabled = True
+		buttonDownload64.disabled = True
+		buttonDownload32.disabled = True
+		buttonOpenFile.disabled = True
+		' formImageName.disabled = True
+	End Sub
+	
+	Sub ButtonsEnable
+		buttonWriteImage.disabled = False
+		buttonWriteZeroImage.disabled = False
+		buttonPopulateDrives.disabled = False
+		buttonDownload64.disabled = False
+		buttonDownload32.disabled = False
+		buttonOpenFile.disabled = False	
+		' formImageName.disabled = False
+	End Sub
+	
+	Function GetSelectedDrives ()
+		Dim n, nn, intDriveLength, arrSelectedDrives()
+		
+		ReDim arrSelectedDrives(0)
+		nn=0
+		
+		intDriveLength = formDisk_length.Value
+
+		' Loop through all checkboxes
+		For n = 1 to intDriveLength
+			If Eval("formDisk_" & n & ".Checked") Then
+				nn = nn + 1
+				ReDim Preserve arrSelectedDrives(nn)
+				arrSelectedDrives(nn) = Eval("formDisk_" & n & ".value")
+			End If
+		Next
+		
+		GetSelectedDrives = arrSelectedDrives
+	End Function
+	
+	Function DownloadImage (strURL, strDestinationFile)
+		Dim strCurlCmd, exitcode
+		
+		strCurlCmd = Chr(34) & BIN_CURL & Chr(34) & " -L -k """ & strURL & """ -o """ & strDestinationFile & Chr(34)
+		
+		Dim shell
+		Set shell = CreateObject("WScript.Shell")
+		AppendWriteStatus("Levynkuvan lataus käynnistetty.")
+		AppendWriteStatus("cURL: " & strCurlCmd)
+
+		ButtonsDisable
+		exitcode = shell.Run(strCurlCmd, 1, TRUE)
+		ButtonsEnable
+		
+		If (exitcode = 0) Then
+			AppendWriteStatus("Levynkuvan lataus onnistui")
+		Else
+			AppendWriteStatus("Levynkuvan lataus epäonnistui, virhekoodi #" & exitcode)
+		End If
+	End Function
+	
+	
+	Sub Download32
+		Dim strDestinationPath, strResult
+		
+		strDestinationPath = GetLocalImageDirectoryPath() & "DigabiOS-32bit.iso"
+		
+		strResult = DownloadImage(DOWNLOAD_32BIT, strDestinationPath)
+		
+		objCurrentImage.InnerHTML = strDestinationPath
+		CheckImagePath
+	End Sub
+	
+	Sub Download64
+		Dim strDestinationPath, strResult
+		
+		strDestinationPath = GetLocalImageDirectoryPath() & "DigabiOS-64bit.iso"
+		
+		strResult = DownloadImage(DOWNLOAD_64BIT, strDestinationPath)
+
+		objCurrentImage.InnerHTML = strDestinationPath
+		CheckImagePath
+	End Sub
+	
+    Sub SetCurrentImage
+		objCurrentImage.InnerHTML = formImageName.value
+		CheckImagePath
+    End Sub
+	
+	Sub openImageFile
+		Dim s, i2
+		
+		s = Dlg.openfiledlg(CStr(GetLocalImageDirectoryPath() & "*.iso"), , , CStr("Valitse tiedosto"))  
+		If (Len(s) > 0) Then
+			' A file was selected
+			
+			'--strange HTMLDlgHelper behavior. Returns a string ending with nulls.
+			'-- The nulls won't affect using the string, but they will matter if you test the string.
+			'-- For instance: If UCase(Right(s, 3)) = "TXT" Then ....   That won't work unless the nulls are snipped.    
+			'-- so check for nulls. If first null is first character that will return "". Otherwise there's a path string to
+			'--  extract from the string buffer.
+			i2 = InStr(s, Chr(0))
+			If i2 > 1 Then  s = Left(s, (i2 - 1))
+			' Set file path to hidden field on the form
+			formImageName.value = s
+			SetCurrentImage
+		End If
+	End Sub
+	
+	Sub WriteImage (strFunction)
+		Dim strImageFile, arrSelectedDrives, strWorkerCmd, objButton, returnCode, n, exitcode
+		
+		' Set image file
+		strImageFile = objCurrentImage.InnerHTML
+		If strFunction = "zero" Then
+			strImageFile = ReadMEBDDInstallationPath() & "\zero_image.iso"
+		End If
+		
+		' Check if file exists
+		Dim fso
+		Set fso = CreateObject("Scripting.FileSystemObject")
+		If (Not fso.FileExists(strImageFile)) Then
+			MsgBox "Tiedostoa " & strImageFile & " ei löydy", 16, "Virhe"
+			Exit Sub
+		End If
+		
+		arrSelectedDrives = GetSelectedDrives()
+		
+		If (UBound(arrSelectedDrives) = 0) Then
+			MsgBox "Valitse USB-muistitikku", 16, "Virhe"
+			Exit Sub
+		End If
+		
+		returnCode = MsgBox("Varoitus! Tämä toimenpide ylikirjoittaa valitsemasi USB-muistit. Oletko varma, että haluat jatkaa?", 1+32+256, "Vahvista")
+		
+		If returnCode <> 1 Then
+			MsgBox "Toimenpide peruutettiin", 64, "Peruutus"
+			Exit Sub
+		End If
+		
+		If not strFunction = "zero" Then
+			WriteLastImagePath(strImageFile)
+		End If
+		
+		strWorkerCmd = Chr(34) & BIN_MEBDD_WORKER & Chr(34) & " " & Chr(34) & strImageFile & Chr(34)
+		
+		AppendWriteStatus(strWorkerCmd)
+
+		For n = 1 to UBound(arrSelectedDrives)
+			strWorkerCmd = strWorkerCmd & " " & Chr(34) & arrSelectedDrives(n) & Chr(34)
+		Next
+		
+		Dim shell
+		Set shell = CreateObject("WScript.Shell")
+		If strFunction = "zero" Then
+			AppendWriteStatus("Levynkuvan kirjoitus (USB-muistin tyhjennys) on käynnistetty.")
+		Else
+			AppendWriteStatus("Levynkuvan kirjoitus on käynnistetty.")
+		End If
+		AppendWriteStatus("mebdd_worker: " & strWorkerCmd)
+
+		ButtonsDisable
+		exitcode = shell.Run(strWorkerCmd, 1, TRUE)
+		ButtonsEnable
+
+		If (exitcode = 255) Then
+			If strFunction = "zero" Then
+				AppendWriteStatus("Levynkuvan kirjoitus (USB-muistin tyhjennys) onnistui")
+				MsgBox "USB-muisti on tyhjennetty. Irrota ja liitä muisti takaisin. Hyväksy ehdotus alustuksesta (formatoinnista).", 64
+			Else
+				AppendWriteStatus("Levynkuvan kirjoitus onnistui")
+			End If
+		Else
+			AppendWriteStatus("Levynkuvan kirjoitus epäonnistui, virhekoodi #" & exitcode & _
+				" <a href='file://" & GetEnvironmentString("TEMP") & "\mebdd_worker.txt'>Avaa lokitiedosto</a>")
+		End If
+	End Sub
+	
+	Sub CheckImagePath
+		Dim fso
+		Set fso = CreateObject("Scripting.FileSystemObject")
+		If (Not fso.FileExists(objCurrentImage.InnerHTML)) Then
+			objStep1Logo.InnerHTML = "<img src=""marssiva_kukko_harmaa.png"">"
+		Else
+			objStep1Logo.InnerHTML = "<img src=""marssiva_kukko_vihrea.png"">"
+		End If
+	End Sub
+	
+	Sub CheckSelectedDrive
+		Dim arrSelectedDrives, objButton
+		
+		arrSelectedDrives = GetSelectedDrives()
+		
+		If (UBound(arrSelectedDrives) > 0) Then
+			objStep2Logo.InnerHTML = "<img src=""marssiva_kukko_vihrea.png"">"
+		Else
+			objStep2Logo.InnerHTML = "<img src=""marssiva_kukko_harmaa.png"">"
+		End If
+	End Sub
+	
+	Function AppendWriteStatus (strNewMessage)
+		objWriteStatus.InnerHTML = Time & " : " & strNewMessage & "<br/>" & objWriteStatus.InnerHTML
+	End Function
+	
+	Sub Window_onLoad
+		' Set previous image path
+		Dim strLastImagePath
+		strLastImagePath = ReadLastImagePath()
+		objCurrentImage.InnerHTML = strLastImagePath
+		CheckImagePath
+		
+		' Set drive options
+		PopulateDrives
+	End Sub
+	
+</script>
+
+<body>
+<table>
+<tr><td colspan="2"><h1>Vaihe 1: Lataa tai valitse kopioitava levynkuva</h1></td></tr>
+<tr>
+	<td id="objStep1Logo" width="100px"></td>
+	<td>
+	<p>Levynkuva sisältää Digabi OS:n yhdessä tiedostossa. Levynkuvan tiedostopääte on .iso. Voit ladata levynkuvan selaimella tai käyttämällä alla olevia painikkeita. Jos koneellasi on jo levynkuva, voit valita tämän tiedoston.</p>
+	<p>Valittu levynkuva: <span class="file_path"><span id="objCurrentImage"></span></span></p>
+	<p>Hae uusi levynkuva:
+	<ul>
+	<li>Koneellasi ei ole tiedostoa: <input type="button" id="buttonDownload64" value="Lataa 64-bittinen versio" onclick="Download64()"></li>
+	<li>Koneellasi ei ole tiedostoa: <input type="button" id="buttonDownload32" value="Lataa 32-bittinen versio" onclick="Download32()"> - kokeile tätä, jos kone ei käynnisty 64-bittisellä versiolla</li>
+	<li>Koneellasi on jo tiedosto: <!-- <input type="file" id="formImageName" onchange="setCurrentImage()"> --><input type="hidden" id="formImageName" value=""><input type="button" id="buttonOpenFile" value="Avaa .iso-tiedosto" onClick="openImageFile()"></li>
+	</ul>
+	</td>
+</tr>
+
+<tr><td colspan="2"><h1>Vaihe 2: Valitse käytettävä USB-muistitikku</h1></td></tr>
+<tr>
+	<td id="objStep2Logo" width="100px"></td>
+	<td>
+	<p>Valitse yksi tai useampi USB-muisti, johon haluat kirjoittaa levynkuvan. Jos et ole vielä syöttänyt USB-muistia koneeseen, tee se nyt ja napsauta Etsi USB-muistit -painiketta.</p>
+	<span class="radio_disk_normal">
+	<span id="objRadioButtonArea"></span>
+	<br/><input type="button" id="buttonPopulateDrives" value="Etsi USB-muistit" onclick="PopulateDrives">
+	<input type="button" id="buttonWriteZeroImage" value="Tyhjennä valitut muistit" onclick="WriteImage('zero')">
+	</td>
+</tr>
+
+<tr><td colspan="2"><h1>Vaihe 3: Kopioi levynkuva USB-muistitikulle</h1></td></tr>
+<tr>
+	<td id="objStep3Logo" width="100px"></td>
+	<td>
+	<p>Kun olet valinnut kopioitavan levynkuvan ja käytettävän USB-muistitikun, napsauta allaolevasta painikkeesta.</p>
+	<input type="button" id="buttonWriteImage" value="Kirjoita levynkuva" onclick="WriteImage('normal')">
+	<br/><br/>
+	<span id="objWriteStatus"></span>
+	</td>
+</tr>
+</table>
+<!-- This is needed for file open dialog -->
+<OBJECT ID=Dlg CLASSID="CLSID:3050F4E1-98B5-11CF-BB82-00AA00BDCE0B" width=0 height=0> </OBJECT>
+</body>

@@ -1,0 +1,28 @@
+MEB DD
+------
+
+MEB DD on yksinkertainen wrapperi komentorivipohjaiselle dd-ohjelmalle.
+Ohjelmalla voi kopioida minkä tahansa iso-tiedoston USB-tikulle, mutta
+se on optimoitu erityisesti DigabiOS:n asennukseen. Käyttöliittymässä on
+painikkeet DigabiOS:n uusimpien versioiden lataukseen.
+
+Itse ohjelmakoodi (meb_dd.hta) on lisensoitu GPL:lla. Tarkka lisenssiteksti
+löytyy ohjelmatiedoston alusta ja tiedostosta (meb_dd_copying.txt).
+
+Asennuspaketista löytyy myös kolme ohjelmaa, joilla on omat lisenssinsä.
+
+dd.exe
+- Kopioi iso-tiedoston USB-muistille
+- Kotisivu verkossa: http://www.chrysocome.net/dd
+- Lisenssi: dd_copying.txt
+
+curl.exe
+- Lataa iso-tiedoston www-palvelimelta
+- Kotisivu verkossa: http://curl.haxx.se/
+- Lisenssi: curl_license.txt
+
+OpenSSL
+- cURL käyttää OpenSSL-kirjastoja (libeay32.dll, ssleay32.dll)
+- Kotisivu verkossa: http://www.openssl.org
+- Windows-asennuspaketti: https://www.openssl.org/related/binaries.html
+- Lisenssi: openssl_license.txt
