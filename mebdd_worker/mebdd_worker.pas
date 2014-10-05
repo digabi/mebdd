@@ -21,9 +21,11 @@ type
 var
 	path_mebdd:string='';
 	path_diskpart:string='';
+	path_cmd:string='';
 	path_image:string='';
 	path_drives:Tdrive_string_arr;
 	path_drive_count:word=0;
+	switch_verify:boolean=False;
 	
 
 function file_is_readable(file_path:String):boolean;
@@ -45,6 +47,25 @@ begin
 	end;
 	
 	file_is_readable := _result;
+end;
+
+function get_file_size(file_path:String):LongInt;
+var
+	_result:LongInt;
+	f:File of Byte;
+
+begin	
+	{$I+}
+	try
+		Assign(f,file_path);
+		Reset(f);
+		_result := FileSize(f);
+		Close(f);
+	except
+		// FIXME
+	end;
+	
+	get_file_size := _result;
 end;
 
 function is_worker_already_running():Boolean;
@@ -83,6 +104,7 @@ begin
 	
 	RegexObj := TRegExpr.Create;
 	RegexObj.Expression := '^\\\\\.\\PHYSICALDRIVE(\d)$';
+	RegexObj.ModifierI := True;
 	if RegexObj.Exec(devicepath) then
 		begin
 			str_devicepath_disknumber := RegexObj.Match[1];
@@ -131,7 +153,7 @@ begin
 		end;
 	
 	// Run processes
-	finished_processes := run_processes(drive_count, cmdline, ': USB\r', '');
+	finished_processes := run_processes_count(drive_count, cmdline, ': USB\r', '');
 	
 	// Delete temporary files
 	for n:=0 to drive_count-1 do
@@ -146,7 +168,66 @@ begin
 		drive_paths_are_usb := False;
 end;
 
+function get_file_digest(path_image:String):String;
+var
+	image_details, image_details_this: String;
+	image_filedate: LongInt;
+	digest: String;
+	cmdline:Texec_params_array;
+	parameters:TStringList;
+	process_output:Tproc_output_arr;
+	RegexObj: TRegExpr;
+	
+begin
+	// Try to read an existing digest
+	image_details := read_registry_hkcu_value_string('Software\MEB Finland\mebdd', 'image_details');
+	digest := read_registry_hkcu_value_string('Software\MEB Finland\mebdd', 'image_md5');
+	
+	image_filedate := FileAge(path_image);
+	
+	if image_filedate = -1 then
+		image_details_this := path_image + ':' + IntToStr(get_file_size(path_image))
+	else
+		image_details_this := path_image + ':' + IntToStr(get_file_size(path_image)) + ':' + DateTimeToStr(FileDateTodateTime(image_filedate));
+	
+	if image_details <> image_details_this then
+		begin
+		// The digest does not belong to this file
+		digest := '';
+		end;
+		
+	// If we did not find a digest, calculate it
+	if digest = '' then
+		begin
+			// Run MD5 as an external process
+			cmdline[0].executable := IncludeTrailingPathDelimiter(path_mebdd)+'md5.exe';
+			parameters := TStringList.Create;
+			parameters.Add(path_image);
+			cmdline[0].parameters := parameters;
+			
+			process_output := run_processes(1, cmdline);
+			
+			// Search the MD5 digest from the output
+			RegexObj := TRegExpr.Create;
+			RegexObj.Expression := '^([0123456789abcdef]+) ';
+			RegexObj.ModifierI := True;
+			if RegexObj.Exec(process_output[0]) then
+				begin
+					digest := RegexObj.Match[1];
+					
+					// Store digest to registry
+					if not write_registry_hkcu_value_string('Software\MEB Finland\mebdd', 'image_details', image_details_this) then
+						proc_log_writeln('Warning: Could not store digest to registry - image_details');
+					if not write_registry_hkcu_value_string('Software\MEB Finland\mebdd', 'image_md5', digest) then
+						proc_log_writeln('Warning: Could not store digest to registry - image_md5');
+				end;
+		end;
 
+	get_file_digest := digest;
+end;
+
+
+	
 function clear_partition_tables(drive_count:Word; drives:Tdrive_string_arr):Boolean;
 var
 	cmdline:Texec_params_array;
@@ -185,7 +266,7 @@ begin
 		end;
 	
 	// Run processes
-	finished_processes := run_processes(drive_count, cmdline, 'exit_code:0', '');
+	finished_processes := run_processes_count(drive_count, cmdline, 'exit_code:0', '');
 	
 	// Delete temporary files
 	for n:=0 to drive_count-1 do
@@ -198,33 +279,6 @@ begin
 		clear_partition_tables := True
 	else
 		clear_partition_tables := False;
-end;
-
-function diskpart_rescan():Boolean;
-var
-	cmdline:Texec_params_array;
-	parameters:TStringList;
-	finished_processes:Word;
-	
-begin
-	cmdline[0].executable := path_diskpart;
-	parameters := TStringList.Create;
-	parameters.Add('/s');
-	parameters.Add(IncludeTrailingPathDelimiter(path_mebdd)+'diskpart.txt');
-	cmdline[0].parameters := parameters;
-	
-	finished_processes := run_processes(1, cmdline, '', '');
-	
-	if finished_processes = 1 then
-		begin
-			diskpart_rescan := True;
-			// Wait for 15 seconds (suggested by MS) to give time to disk-related processes
-			write('Sleeping for 15 seconds...');
-			Sleep(15000);
-			writeln('OK');
-		end
-	else
-		diskpart_rescan := False;
 end;
 
 function write_disk_image(drive_count:Word; drives:Tdrive_string_arr; image_file:String):Boolean;
@@ -245,7 +299,7 @@ begin
 			dd_cmdline[n].parameters := parameters;
 		end;
 	
-	finished_processes := run_processes(drive_count, dd_cmdline, '', '.*Error.*');
+	finished_processes := run_processes_count(drive_count, dd_cmdline, '', '.*Error.*');
 	
 	if finished_processes = drive_count then
 		write_disk_image := True
@@ -254,9 +308,48 @@ begin
 
 end;
 
+function verify_disk_image(drive_count:Word; drives:Tdrive_string_arr; image_path: String; digest:String):Boolean;
+var
+	dd_cmdline:Texec_params_array;
+	parameters:TStringList;
+	finished_processes:Word;
+	n:Word;
+	file_size: LongInt;
+	
+begin
+	for n:=0 to drive_count-1 do
+		begin
+			file_size := get_file_size(image_path);
+			
+			dd_cmdline[n].executable := path_cmd;
+			parameters := TStringList.Create;
+			parameters.Add('/c');
+			parameters.Add('"');
+			parameters.Add(IncludeTrailingPathDelimiter(path_mebdd)+'dd.exe');
+			parameters.Add('if="'+drives[n]+'"');
+			parameters.Add('of=-');
+			parameters.Add('bs='+IntToStr(file_size));
+			parameters.Add('count=1');
+			parameters.Add('|');
+			parameters.Add(IncludeTrailingPathDelimiter(path_mebdd)+'md5.exe');
+			parameters.Add('"');
+			dd_cmdline[n].parameters := parameters;
+		end;
+	
+	finished_processes := run_processes_count(drive_count, dd_cmdline, digest+' ', '');
+	
+	if finished_processes = drive_count then
+		verify_disk_image := True
+	else
+		verify_disk_image := False;
+
+end;
+
 
 var
 	n:Word;
+	param_n:Word;
+	image_digest:String;
 	
 begin
 	// Init log file
@@ -273,6 +366,7 @@ begin
 	// Read paths from the registry
 	path_mebdd := read_registry_hklm_value_str('SOFTWARE\MEB Finland\mebdd', 'path_mebdd');
 	path_diskpart := read_registry_hklm_value_str('SOFTWARE\MEB Finland\mebdd', 'path_diskpart');
+	path_cmd := read_registry_hklm_value_str('SOFTWARE\MEB Finland\mebdd', 'path_cmd');
 	
 	if path_mebdd = '' then
 		begin
@@ -286,6 +380,12 @@ begin
 			proc_log_halt(3);
 		end;
 	
+	if path_cmd = '' then
+		begin
+			proc_log_writeln('Error: CMD path is not set');
+			proc_log_halt(3);
+		end;
+	
 	if is_worker_already_running() then
 		begin
 			proc_log_writeln('Error: mebdd_worker is already running');
@@ -293,10 +393,27 @@ begin
 		end;
 		
 	// Read command line parameters
-	if (ParamCount > 0) then
-		path_image := ParamStr(1);
+	if (ParamCount = 0) then
+		begin
+			writeln('usage: mebdd_worker [-v] image_to_write.iso device_to_write1 [device_to_writeN...]');
+			proc_log_halt(11);
+		end;
 	
-	for n:=2 to ParamCount do
+	param_n := 1;
+	
+	// Do we have -v = verify?
+	if ParamStr(param_n) = '-v' then
+		begin
+			switch_verify := True;
+			param_n := 2;
+		end
+	else
+		switch_verify := False;
+		
+	path_image := ParamStr(param_n);
+	Inc(param_n);
+
+	for n:=param_n to ParamCount do
 		begin
 			path_drives[path_drive_count] := ParamStr(n);
 			path_drive_count := path_drive_count+1;
@@ -332,30 +449,35 @@ begin
 			proc_log_halt(8);
 		end;
 		
+	// Count/create file MD5 digest
+	if (switch_verify) then
+		begin
+			proc_log_writeln('Getting image file digest:');
+			image_digest := get_file_digest(path_image);
+			if (image_digest = '') then
+				begin
+					proc_log_writeln('Error: Could not get image digest');
+					proc_log_halt(13);
+				end
+			else
+				proc_log_writeln('Success!                                 ');
+		end
+	else
+		image_digest := '';
+	
 	// Clear partition tables
 	proc_log_writeln('Clearing master boot record(s) and partition table(s):');
 	if clear_partition_tables(path_drive_count, path_drives) then
 		begin
 			proc_log_writeln('Success!                                 ');
+			// Sleep 3 seconds to wait all pending disk activity to end
+			Sleep(3000);
 		end
 	else
 		begin
 			proc_log_writeln('Error: Failed to clear partition table');
 			proc_log_halt(9);
 		end;
-	
-(*	// Run DISKPART.EXE (RESCAN)
-	proc_log_writeln('Initialising partition table cache:');
-	if diskpart_rescan() then
-		begin
-			proc_log_writeln('Success!                                 ');
-		end
-	else
-		begin
-			proc_log_writeln('Error: Failed to run DISKPART RESCAN');
-			proc_log_halt(9);
-		end;
-*)
 	
 	// Write image
 	proc_log_writeln('Writing disk image(s):');
@@ -368,7 +490,28 @@ begin
 			proc_log_writeln('Error: Failed to write disk image');
 			proc_log_halt(10);
 		end;
-		
+	
+	// Verify image
+	if (switch_verify) then
+		if image_digest = '' then
+			begin
+				proc_log_writeln('Error: Image verify failed as MD5 was not calculated');
+				proc_log_halt(12);
+			end
+		else
+			begin
+				proc_log_writeln('Verifying disk image(s):');
+				if verify_disk_image(path_drive_count, path_drives, path_image, image_digest) then
+					begin
+						proc_log_writeln('Success!                                 ');
+					end
+				else
+					begin
+						proc_log_writeln('Error: disk image verification failed');
+						proc_log_halt(13);
+					end;
+			end;
+
 	// Clear lock
 	write_registry_hkcu_value_int('Software\MEB Finland\mebdd', 'running_pid', 0);
 	

@@ -26,3 +26,53 @@ OpenSSL
 - Kotisivu verkossa: http://www.openssl.org
 - Windows-asennuspaketti: https://www.openssl.org/related/binaries.html
 - Lisenssi: openssl_license.txt
+
+Muutokset
+---------
+
+1.1c (30.9.2014)
+- mebdd worker osaa nyt oikeasti luoda rekisteriarvon myös 32-bittisessä
+  käyttöjärjestelmässä
+  
+1.1b (29.9.2014)
+- varmistetaan levyn tyhjennys ennen imagen kirjoittamista
+- mebdd_workerissa korjattu toimimaan myös suomenkielisessä Windowsissa,
+  nyt pitäisi toimia DISKPARTin kielestä riippumatta
+- mebdd_worker osaa luoda rekisteriarvon myös 32-bittisessä käyttöjärjestelmässä
+
+1.1a (28.9.2014)
+- useamman muistitikun kirjoitus yhtäaikaisesti
+- levyn tyhjennystoiminto (kirjoittaa levylle tyhjän MBR:n)
+- iso-tiedoston valinnassa oletushakemistona local profilen alla oleva
+  hakemisto, johon mebdd.hta lataa imaget
+
+- dd/diskpart ajetaan Free Pascalilla kirjoitetulla mebdd_worker-ohjelmalla,
+  joka mm. pyytää admin-oikeudet, tarkkailee dd:n tulostuksia ja palauttaa
+  mebdd.hta:lle virhekoodit
+- MBR:n tyhjennys dd:llä ja DISKPART RESCAN korvattu DISKPART CLEAN
+  -toiminnolla, joka näyttäisi toimivan paremmin kuin edellinen menetelmä
+- mebdd_worker kirjoittaa lokia käyttäjän TEMP-hakemistoon
+- asennusohjelma tallettaa rekisteriin mebdd:n asennushakemiston ja DISKPART.exe:n
+  polun
+- mebdd.hta ajetaan 64-bittisellä mshta.exe:llä, jotta HKLM-haaran rekisterien
+  lukeminen onnistuisi
+- ensimmäinen testiversio
+  
+1.0.4 (16.9.2014)
+- Korvattu muistitikun irrotus-/liittämisvaihe DISKPARTin RESCAN
+  -toiminnon ajamisella
+  
+1.0.3 (12.9.2014)
+- Muutettu muistitikun irrotus-/liittämisvaiheen värit ohjeistuksen
+  helpottamiseksi
+ 
+1.0.2 (10.9.2014)
+- Korjattu bugi, joka esti imagen lukemisen, jos imagetiedoston polussa oli
+  välilyöntejä
+  
+1.0.1
+- Kierretty tietyillä USB-muisteilla ilmennyt Access Denied -ongelma
+- dd päivitetty versiosta 0.5 versioon 0.6beta3
+
+1.0
+- Ensimmäinen levytetty versio

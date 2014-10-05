@@ -15,6 +15,7 @@ const
 	
 type
 	Tdrive_string_arr = Array [0..DRIVE_MAX] of String;
+	Tproc_output_arr = Array [0..DRIVE_MAX] of String;
 	Texec_params = Record
 		executable : String;
 		parameters : TStringList;
@@ -30,7 +31,8 @@ procedure proc_log_truncate ();
 procedure proc_log_writeln (message:String);
 procedure proc_log_halt (e:Integer);
 procedure proc_log_string (message:String);
-function run_processes(proc_count:Word; cmdline:Texec_params_array; success_regexp:String; failure_regexp:String):Word;
+function run_processes(proc_count:Word; cmdline:Texec_params_array):Tproc_output_arr;
+function run_processes_count(proc_count:Word; cmdline:Texec_params_array; success_regexp:String; failure_regexp:String):Word;
 
 implementation
 
@@ -126,7 +128,7 @@ begin
 end;
 
 
-function run_processes(proc_count:Word; cmdline:Texec_params_array; success_regexp:String; failure_regexp:String):Word;
+function run_processes(proc_count:Word; cmdline:Texec_params_array):Tproc_output_arr;
 
 var
 	proc_handle: Array [0..DRIVE_MAX] of TProcess;
@@ -136,10 +138,9 @@ var
 	proc_output_bytes_available: LongInt;
 	proc_output_bytes_read: LongInt;
 	proc_output_stringlist: TStringList;
-	finished_processes, failed_processes:Word;
-	process_failed: Boolean;
+	proc_output_result: Tproc_output_arr;
+	finished_processes:Word;
 	n:Word;
-	RegexObj: TRegExpr;
 	
 	cycle_string: Array of String;
 	cycle_n: Word;
@@ -203,7 +204,6 @@ begin
 	
 	// Wait for all processed to end
 	finished_processes := 0;
-	failed_processes := 0;
 	
 	while finished_processes < proc_count do
 		begin
@@ -247,49 +247,9 @@ begin
 									proc_log_string('Process finished:');
 									proc_log_string(proc_output_stringlist.Text);
 									
-									// Check from output whether process output if process has failed
-									process_failed := False;
+									// Store process output
+									proc_output_result[n] := proc_output_stringlist.Text;
 									
-									// First check the success regexp
-									if success_regexp <> '' then
-										begin
-											RegexObj := TRegExpr.Create;
-											RegexObj.Expression := success_regexp;
-											if RegexObj.Exec(proc_output_stringlist.Text) then
-												begin
-													// This process reported success
-													process_failed := False;
-												end
-											else
-												begin
-													// Oops, the output misses the success match
-													process_failed := True;
-												end;
-										end;
-										
-									if failure_regexp <> '' then
-										begin
-											RegexObj := TRegExpr.Create;
-											RegexObj.Expression := failure_regexp;
-											if RegexObj.Exec(proc_output_stringlist.Text) then
-												begin
-													// This process reported failure
-													process_failed := True;
-												end;
-										end;
-									
-									RegexObj.Free;
-									proc_output_stringlist.Free;
-									
-									if process_failed then
-										begin
-										proc_log_string('Process finish status: FAILED');
-										Inc(failed_processes);
-										end
-									else
-										begin
-										proc_log_string('Process finish status: SUCCESS');
-										end;
 								end;
 						end;
 					
@@ -302,7 +262,75 @@ begin
 			Sleep(1000);
 		end;
 
-	run_processes := proc_count - failed_processes;
+	run_processes := proc_output_result;
 end;
+
+function run_processes_count(proc_count:Word; cmdline:Texec_params_array; success_regexp:String; failure_regexp:String):Word;
+var
+	process_output: Tproc_output_arr;
+	n: Word;
+	RegexObj: TRegExpr;
+	process_failed: Boolean;
+	failed_processes: Word;
+	
+begin
+	// Call underlying process executer
+	process_output := run_processes(proc_count, cmdline);
+	
+	// Go through all output
+	failed_processes := 0;
+	
+	for n := 0 to proc_count-1 do
+		begin
+	
+			// Check from output whether process output if process has failed
+			process_failed := False;
+			
+			// First check the success regexp
+			if success_regexp <> '' then
+				begin
+					RegexObj := TRegExpr.Create;
+					RegexObj.Expression := success_regexp;
+					RegexObj.ModifierI := True;
+					if RegexObj.Exec(process_output[n]) then
+						begin
+							// This process reported success
+							process_failed := False;
+						end
+					else
+						begin
+							// Oops, the output misses the success match
+							process_failed := True;
+						end;
+				end;
+				
+			if failure_regexp <> '' then
+				begin
+					RegexObj := TRegExpr.Create;
+					RegexObj.Expression := failure_regexp;
+					RegexObj.ModifierI := True;
+					if RegexObj.Exec(process_output[n]) then
+						begin
+							// This process reported failure
+							process_failed := True;
+						end;
+				end;
+			
+			RegexObj.Free;
+			
+			if process_failed then
+				begin
+				proc_log_string('Process finish status: FAILED');
+				Inc(failed_processes);
+				end
+			else
+				begin
+				proc_log_string('Process finish status: SUCCESS');
+				end;
+		end;
+
+	run_processes_count := proc_count - failed_processes;
+end;
+
 
 end.

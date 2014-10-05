@@ -1,5 +1,5 @@
 <head>
-<title>MEB DD 1.1b</title>
+<title>MEB DD 1.2a</title>
 <HTA:APPLICATION 
      APPLICATIONNAME="MEB DD"
      SCROLL="yes"
@@ -345,7 +345,12 @@
 			WriteLastImagePath(strImageFile)
 		End If
 		
-		strWorkerCmd = Chr(34) & BIN_MEBDD_WORKER & Chr(34) & " " & Chr(34) & strImageFile & Chr(34)
+		If checkboxVerify.checked Then
+			' Execute mebdd_worker with verify
+			strWorkerCmd = Chr(34) & BIN_MEBDD_WORKER & Chr(34) & " -v " & Chr(34) & strImageFile & Chr(34)
+		Else
+			strWorkerCmd = Chr(34) & BIN_MEBDD_WORKER & Chr(34) & " " & Chr(34) & strImageFile & Chr(34)
+		End If
 		
 		AppendWriteStatus(strWorkerCmd)
 
@@ -420,13 +425,13 @@
 
 <body>
 <table>
-<tr><td colspan="2"><h1>Vaihe 1: Lataa tai valitse kopioitava levynkuva</h1></td></tr>
+<tr><td colspan="2"><h1>Vaihe 1: Lataa tai valitse tarvittava tiedosto</h1></td></tr>
 <tr>
 	<td id="objStep1Logo" width="100px"></td>
 	<td>
-	<p>Levynkuva sisältää Digabi OS:n yhdessä tiedostossa. Levynkuvan tiedostopääte on .iso. Voit ladata levynkuvan selaimella tai käyttämällä alla olevia painikkeita. Jos koneellasi on jo levynkuva, voit valita tämän tiedoston.</p>
-	<p>Valittu levynkuva: <span class="file_path"><span id="objCurrentImage"></span></span></p>
-	<p>Hae uusi levynkuva:
+	<p>Tarvittavan tiedoston tiedostopääte on .iso. Voit ladata tiedoston selaimella tai käyttämällä alla olevia painikkeita. Vaihtoehtoisesti voit käyttää jo lataamaasi tiedostoa.</p>
+	<p>Valittu tiedosto: <span class="file_path"><span id="objCurrentImage"></span></span></p>
+	<p>Hae uusi tiedosto:
 	<ul>
 	<li>Koneellasi ei ole tiedostoa: <input type="button" id="buttonDownload64" value="Lataa 64-bittinen versio" onclick="Download64()"></li>
 	<li>Koneellasi ei ole tiedostoa: <input type="button" id="buttonDownload32" value="Lataa 32-bittinen versio" onclick="Download32()"> - kokeile tätä, jos kone ei käynnisty 64-bittisellä versiolla</li>
@@ -439,11 +444,11 @@
 <tr>
 	<td id="objStep2Logo" width="100px"></td>
 	<td>
-	<p>Valitse yksi tai useampi USB-muisti, johon haluat kirjoittaa levynkuvan. Jos et ole vielä syöttänyt USB-muistia koneeseen, tee se nyt ja napsauta Etsi USB-muistit -painiketta.</p>
+	<p>Valitse yksi tai useampi USB-muisti, johon haluat kirjoittaa DigabiOS:n. Jos et ole vielä syöttänyt USB-muistia koneeseen, tee se nyt ja napsauta Etsi USB-muistit -painiketta.</p>
 	<span class="radio_disk_normal">
 	<span id="objRadioButtonArea"></span>
 	<br/><input type="button" id="buttonPopulateDrives" value="Etsi USB-muistit" onclick="PopulateDrives">
-	<input type="button" id="buttonWriteZeroImage" value="Tyhjennä valitut muistit" onclick="WriteImage('zero')">
+	<input type="button" id="buttonWriteZeroImage" value="Palauta muistit alkuperäiseen kokoonsa" onclick="WriteImage('zero')">
 	</td>
 </tr>
 
@@ -451,6 +456,7 @@
 <tr>
 	<td id="objStep3Logo" width="100px"></td>
 	<td>
+	<p><input type="checkbox" id="checkboxVerify" name="checkboxVerify" checked>Tarkista kirjoitettu USB-muistitikku kirjoitusvirheiden varalta</p>
 	<p>Kun olet valinnut kopioitavan levynkuvan ja käytettävän USB-muistitikun, napsauta allaolevasta painikkeesta.</p>
 	<input type="button" id="buttonWriteImage" value="Kirjoita levynkuva" onclick="WriteImage('normal')">
 	<br/><br/>
