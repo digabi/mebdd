@@ -14,31 +14,31 @@ const
 	DRIVE_MAX = 99;
 	
 type
-	Tdrive_string_arr = Array [0..DRIVE_MAX] of String;
-	Tproc_output_arr = Array [0..DRIVE_MAX] of String;
+	Tdrive_string_arr = Array [0..DRIVE_MAX] of AnsiString;
+	Tproc_output_arr = Array [0..DRIVE_MAX] of AnsiString;
 	Texec_params = Record
-		executable : String;
+		executable : AnsiString;
 		parameters : TStringList;
 	end;
 	Texec_params_array = Array [0..DRIVE_MAX] of Texec_params;
 
 var
-	proc_log_file : String = '';
+	proc_log_file : AnsiString = '';
 	
-function is_pid_alive (const pid: DWORD; const proc_name:String): Boolean;
-procedure proc_log_filename (filename:String);
+function is_pid_alive (const pid: DWORD; const proc_name:AnsiString): Boolean;
+procedure proc_log_filename (filename:AnsiString);
 procedure proc_log_truncate ();
-procedure proc_log_writeln (message:String);
+procedure proc_log_writeln (message:AnsiString);
 procedure proc_log_halt (e:Integer);
-procedure proc_log_string (message:String);
+procedure proc_log_string (message:AnsiString);
 function run_processes(proc_count:Word; cmdline:Texec_params_array):Tproc_output_arr;
-function run_processes_count(proc_count:Word; cmdline:Texec_params_array; success_regexp:String; failure_regexp:String):Word;
+function run_processes_count(proc_count:Word; cmdline:Texec_params_array; success_regexp:AnsiString; failure_regexp:AnsiString):Word;
 
 implementation
 
 uses Sysutils, Windows, JwaTlHelp32, Process, RegExpr;
 
-function is_pid_alive (const pid: DWORD; const proc_name:String): Boolean;
+function is_pid_alive (const pid: DWORD; const proc_name:AnsiString): Boolean;
 
 var
 	i: integer;
@@ -69,7 +69,7 @@ begin
 	is_pid_alive := _result;
 end;
 
-procedure proc_log_filename (filename:String);
+procedure proc_log_filename (filename:AnsiString);
 
 begin
 	proc_log_file := filename;
@@ -91,7 +91,7 @@ begin
 end;
 
 
-procedure proc_log_writeln (message:String);
+procedure proc_log_writeln (message:AnsiString);
 
 begin
 	writeln(message);
@@ -106,7 +106,7 @@ begin
 end;
 
 
-procedure proc_log_string (message:String);
+procedure proc_log_string (message:AnsiString);
 
 var
 	f: TextFile;
@@ -142,26 +142,26 @@ var
 	finished_processes:Word;
 	n:Word;
 	
-	cycle_string: Array of String;
+	cycle_string: Array of AnsiString;
 	cycle_n: Word;
 
 	// Helper procedure to read process output from the process handle and add it to
 	// the process output stream (proc_output)
-	procedure add_proc_output_data;
+	procedure add_proc_output_data(proc_index:Word);
 	
 	begin
-		proc_output_bytes_available := proc_handle[n].Output.NumBytesAvailable;
+		proc_output_bytes_available := proc_handle[proc_index].Output.NumBytesAvailable;
 		if proc_output_bytes_available > 0 then
 			begin
 				// The stream has data
+
+				// Allocate space
+				proc_output[proc_index].SetSize(proc_output_bytes[proc_index] + proc_output_bytes_available);
 				
-				// Allocate data
-				proc_output[n].SetSize(proc_output_bytes[n] + proc_output_bytes_available);
-				
-				proc_output_bytes_read := proc_handle[n].Output.Read((proc_output[n].Memory + proc_output_bytes[n])^, proc_output_bytes_available);
+				proc_output_bytes_read := proc_handle[proc_index].Output.Read((proc_output[proc_index].Memory + proc_output_bytes[proc_index])^, proc_output_bytes_available);
 				
 				if proc_output_bytes_read > 0 then
-					Inc(proc_output_bytes[n], proc_output_bytes_read);
+					proc_output_bytes[proc_index] := proc_output_bytes[proc_index] + proc_output_bytes_read;
 			end;
 	end;
 	
@@ -215,7 +215,7 @@ begin
 				begin
 					
 					// Read output (if available)
-					add_proc_output_data;
+					add_proc_output_data(n);
 					
 					if proc_handle[n].Running then
 						begin
@@ -232,7 +232,7 @@ begin
 									Inc(finished_processes);
 									
 									// Read output (if available)
-									add_proc_output_data;
+									add_proc_output_data(n);
 									
 									// Turn flag up so we don't run this again
 									proc_finished[n] := True;
@@ -265,7 +265,7 @@ begin
 	run_processes := proc_output_result;
 end;
 
-function run_processes_count(proc_count:Word; cmdline:Texec_params_array; success_regexp:String; failure_regexp:String):Word;
+function run_processes_count(proc_count:Word; cmdline:Texec_params_array; success_regexp:AnsiString; failure_regexp:AnsiString):Word;
 var
 	process_output: Tproc_output_arr;
 	n: Word;

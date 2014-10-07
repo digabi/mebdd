@@ -8,11 +8,11 @@ unit mebdd_worker_reg;
 
 interface
 
-function read_registry_hklm_value_str (key_path:String; key_name:String):String;
-function read_registry_hkcu_value_int (key_path:String; key_name:String):Integer;
-function read_registry_hkcu_value_string (key_path:String; key_name:String):String;
-function write_registry_hkcu_value_int (key_path:String; key_name:String; new_value:Integer):Boolean;
-function write_registry_hkcu_value_string (key_path:String; key_name:String; new_value:String):Boolean;
+function read_registry_hklm_value_str (key_path:AnsiString; key_name:AnsiString):AnsiString;
+function read_registry_hkcu_value_int (key_path:AnsiString; key_name:AnsiString):Integer;
+function read_registry_hkcu_value_string (key_path:AnsiString; key_name:AnsiString):AnsiString;
+function write_registry_hkcu_value_int (key_path:AnsiString; key_name:AnsiString; new_value:Integer):Boolean;
+function write_registry_hkcu_value_string (key_path:AnsiString; key_name:AnsiString; new_value:AnsiString):Boolean;
 
 implementation
 
@@ -54,10 +54,10 @@ begin
 {$endif}
 end;
 
-function read_registry_hklm_value_str (key_path:String; key_name:String):String;
+function read_registry_hklm_value_str (key_path:AnsiString; key_name:AnsiString):AnsiString;
 
 var
-	key_value: string='';
+	key_value: AnsiString='';
 	registry: TRegistry;
 	
 begin
@@ -82,7 +82,7 @@ begin
 	read_registry_hklm_value_str := key_value;
 end;
 
-function read_registry_hkcu_value_int (key_path:String; key_name:String):Integer;
+function read_registry_hkcu_value_int (key_path:AnsiString; key_name:AnsiString):Integer;
 
 var
 	key_value: integer=-1;
@@ -110,10 +110,10 @@ begin
 	read_registry_hkcu_value_int := key_value;
 end;
 
-function read_registry_hkcu_value_string (key_path:String; key_name:String):String;
+function read_registry_hkcu_value_string (key_path:AnsiString; key_name:AnsiString):AnsiString;
 
 var
-	key_value: String;
+	key_value: AnsiString;
 	registry: TRegistry;
 	
 begin
@@ -138,7 +138,7 @@ begin
 	read_registry_hkcu_value_string := key_value;
 end;
 
-function write_registry_hkcu_value_int (key_path:String; key_name:String; new_value:Integer):Boolean;
+function write_registry_hkcu_value_int (key_path:AnsiString; key_name:AnsiString; new_value:Integer):Boolean;
 
 var
 	write_ok: boolean=false;
@@ -169,7 +169,7 @@ begin
 	write_registry_hkcu_value_int := write_ok;
 end;
 
-function write_registry_hkcu_value_string (key_path:String; key_name:String; new_value:String):Boolean;
+function write_registry_hkcu_value_string (key_path:AnsiString; key_name:AnsiString; new_value:AnsiString):Boolean;
 
 var
 	write_ok: boolean=false;

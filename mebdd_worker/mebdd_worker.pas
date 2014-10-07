@@ -8,31 +8,31 @@ uses Sysutils, Classes, RegExpr, mebdd_worker_reg, mebdd_worker_proc, mebdd_work
 
 (*
 type
-	Tdrive_string_arr = Array [0..99] of String;
+	Tdrive_string_arr = Array [0..99] of AnsiString;
 *)
 	
 (*
 	Texec_params = Record
-		executable : String;
+		executable : AnsiString;
 		parameters : TStrings;
 	end;
 *)
 
 var
-	path_mebdd:string='';
-	path_diskpart:string='';
-	path_cmd:string='';
-	path_image:string='';
-	path_drives:Tdrive_string_arr;
-	path_drive_count:word=0;
-	switch_verify:boolean=False;
+	path_mebdd: AnsiString='';
+	path_diskpart: AnsiString='';
+	path_cmd: AnsiString='';
+	path_image: AnsiString='';
+	path_drives: Tdrive_string_arr;
+	path_drive_count: Word=0;
+	switch_verify: Boolean=False;
 	
 
-function file_is_readable(file_path:String):boolean;
+function file_is_readable(file_path:AnsiString):boolean;
 var
 	_result:boolean=true;
 	f:TextFile;
-	buffer:string;
+	buffer:AnsiString;
 	
 begin
 	{$I+}
@@ -49,7 +49,7 @@ begin
 	file_is_readable := _result;
 end;
 
-function get_file_size(file_path:String):LongInt;
+function get_file_size(file_path:AnsiString):LongInt;
 var
 	_result:LongInt;
 	f:File of Byte;
@@ -92,11 +92,11 @@ begin
 	is_worker_already_running := _result;
 end;
 
-function devicepath_to_disknumber(devicepath:String):String;
+function devicepath_to_disknumber(devicepath:AnsiString):AnsiString;
 var
 	RegexObj: TRegExpr;
-	str_devicepath_disknumber: String;
-	_result: String;
+	str_devicepath_disknumber: AnsiString;
+	_result: AnsiString;
 	
 begin
 	// Default result 'not found'
@@ -118,13 +118,20 @@ end;
 function drive_paths_are_usb(drive_count:Word; drives:Tdrive_string_arr):Boolean;
 var
 	cmdline:Texec_params_array;
-	diskpart_scripts:Tdrive_string_arr;
+	diskpart_script:AnsiString;
 	parameters:TStringList;
-	finished_processes:Word;
-	n:Word;
+	process_output:Tproc_output_arr;
+	n, match_count:Word;
 	f: TextFile;
+	RegexObj: TRegExpr;
 	
 begin
+	diskpart_script := IncludeTrailingPathDelimiter(GetEnvironmentVariable('TEMP'))+'mebdd_worker_'+IntToStr(GetProcessID)+'.txt';
+	
+	// Open DISKPART script file
+	AssignFile(f, diskpart_script);
+	ReWrite(f);
+
 	for n:=0 to drive_count-1 do
 		begin
 			// Create DISKPART script for this drive
@@ -136,43 +143,52 @@ begin
 					Exit;
 				end;
 			
-			diskpart_scripts[n] := IncludeTrailingPathDelimiter(GetEnvironmentVariable('TEMP'))+'mebdd_worker_'+IntToStr(GetProcessID)+'_'+IntToStr(n)+'.txt';
-			
-			AssignFile(f, diskpart_scripts[n]);
-			ReWrite(f);
 			writeln(f, 'SELECT DISK '+devicepath_to_disknumber(drives[n]));
 			writeln(f, 'DETAIL DISK');
-			CloseFile(f);
-			
-			// Set process executable + parameters
-			cmdline[n].executable := path_diskpart;
-			parameters := TStringList.Create;
-			parameters.Add('/s');
-			parameters.Add(diskpart_scripts[n]);
-			cmdline[n].parameters := parameters;
-		end;
-	
-	// Run processes
-	finished_processes := run_processes_count(drive_count, cmdline, ': USB\r', '');
-	
-	// Delete temporary files
-	for n:=0 to drive_count-1 do
-		begin
-			If not DeleteFile(diskpart_scripts[n]) Then
-				proc_log_string('Warning: failed to delete temporary file "'+diskpart_scripts[n]+'"');
 		end;
 		
-	if finished_processes = drive_count then
-		drive_paths_are_usb := True
-	else
-		drive_paths_are_usb := False;
+	writeln(f, 'EXIT');
+	CloseFile(f);
+	
+	// Set process executable + parameters
+	cmdline[0].executable := path_diskpart;
+	parameters := TStringList.Create;
+	parameters.Add('/s');
+	parameters.Add(diskpart_script);
+	cmdline[0].parameters := parameters;
+	
+	// Run processes
+	process_output := run_processes(1, cmdline);
+	
+	// Delete DISKPART script
+//	If not DeleteFile(diskpart_script) Then
+//		proc_log_string('Warning: failed to delete temporary file "'+diskpart_script+'"');
+
+	// Check process output
+	RegexObj := TRegExpr.Create;
+	RegexObj.Expression := ': USB\r';
+	if RegexObj.Exec(process_output[0]) then
+		begin
+			// We have at least one match
+			match_count := 1;
+			
+			while RegexObj.ExecNext do
+				Inc(match_count);
+			
+			if match_count = drive_count then
+				drive_paths_are_usb := True
+			else
+				drive_paths_are_usb := False;
+		end;
+
+	RegexObj.Free;
 end;
 
-function get_file_digest(path_image:String):String;
+function get_file_digest(path_image:AnsiString):AnsiString;
 var
-	image_details, image_details_this: String;
+	image_details, image_details_this: AnsiString;
 	image_filedate: LongInt;
-	digest: String;
+	digest: AnsiString;
 	cmdline:Texec_params_array;
 	parameters:TStringList;
 	process_output:Tproc_output_arr;
@@ -231,13 +247,19 @@ end;
 function clear_partition_tables(drive_count:Word; drives:Tdrive_string_arr):Boolean;
 var
 	cmdline:Texec_params_array;
-	diskpart_scripts:Tdrive_string_arr;
+	diskpart_script:AnsiString;
 	parameters:TStringList;
 	finished_processes:Word;
 	n:Word;
 	f: TextFile;
 	
 begin
+	diskpart_script := IncludeTrailingPathDelimiter(GetEnvironmentVariable('TEMP'))+'mebdd_worker_'+IntToStr(GetProcessID)+'.txt';
+	
+	// Open DISKPART script file
+	AssignFile(f, diskpart_script);
+	ReWrite(f);
+
 	for n:=0 to drive_count-1 do
 		begin
 			// Create DISKPART script for this drive
@@ -249,39 +271,34 @@ begin
 					Exit;
 				end;
 			
-			diskpart_scripts[n] := IncludeTrailingPathDelimiter(GetEnvironmentVariable('TEMP'))+'mebdd_worker_'+IntToStr(GetProcessID)+'_'+IntToStr(n)+'.txt';
-			
-			AssignFile(f, diskpart_scripts[n]);
-			ReWrite(f);
 			writeln(f, 'SELECT DISK '+devicepath_to_disknumber(drives[n]));
 			writeln(f, 'CLEAN');
-			CloseFile(f);
-			
-			// Set process executable + parameters
-			cmdline[n].executable := path_diskpart;
-			parameters := TStringList.Create;
-			parameters.Add('/s');
-			parameters.Add(diskpart_scripts[n]);
-			cmdline[n].parameters := parameters;
-		end;
-	
-	// Run processes
-	finished_processes := run_processes_count(drive_count, cmdline, 'exit_code:0', '');
-	
-	// Delete temporary files
-	for n:=0 to drive_count-1 do
-		begin
-			If not DeleteFile(diskpart_scripts[n]) Then
-				proc_log_string('Warning: failed to delete temporary file "'+diskpart_scripts[n]+'"');
 		end;
 		
-	if finished_processes = drive_count then
+	writeln(f, 'EXIT');
+	CloseFile(f);
+	
+	// Set process executable + parameters
+	cmdline[0].executable := path_diskpart;
+	parameters := TStringList.Create;
+	parameters.Add('/s');
+	parameters.Add(diskpart_script);
+	cmdline[0].parameters := parameters;
+	
+	// Run processes
+	finished_processes := run_processes_count(1, cmdline, 'exit_code:0', '');
+	
+	// Delete DISKPART script
+	If not DeleteFile(diskpart_script) Then
+		proc_log_string('Warning: failed to delete temporary file "'+diskpart_script+'"');
+
+	if finished_processes = 1 then
 		clear_partition_tables := True
 	else
 		clear_partition_tables := False;
 end;
 
-function write_disk_image(drive_count:Word; drives:Tdrive_string_arr; image_file:String):Boolean;
+function write_disk_image(drive_count:Word; drives:Tdrive_string_arr; image_file:AnsiString):Boolean;
 var
 	dd_cmdline:Texec_params_array;
 	parameters:TStringList;
@@ -308,7 +325,7 @@ begin
 
 end;
 
-function verify_disk_image(drive_count:Word; drives:Tdrive_string_arr; image_path: String; digest:String):Boolean;
+function verify_disk_image(drive_count:Word; drives:Tdrive_string_arr; image_path: AnsiString; digest:AnsiString):Boolean;
 var
 	dd_cmdline:Texec_params_array;
 	parameters:TStringList;
@@ -349,7 +366,7 @@ end;
 var
 	n:Word;
 	param_n:Word;
-	image_digest:String;
+	image_digest:AnsiString;
 	
 begin
 	// Init log file
