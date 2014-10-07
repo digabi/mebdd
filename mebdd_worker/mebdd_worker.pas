@@ -161,8 +161,8 @@ begin
 	process_output := run_processes(1, cmdline);
 	
 	// Delete DISKPART script
-//	If not DeleteFile(diskpart_script) Then
-//		proc_log_string('Warning: failed to delete temporary file "'+diskpart_script+'"');
+	If not DeleteFile(diskpart_script) Then
+		proc_log_string('Warning: failed to delete temporary file "'+diskpart_script+'"');
 
 	// Check process output
 	RegexObj := TRegExpr.Create;
