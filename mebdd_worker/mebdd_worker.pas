@@ -18,6 +18,9 @@ type
 	end;
 *)
 
+const
+	RETRIES = 3;
+	
 var
 	path_mebdd: AnsiString='';
 	path_diskpart: AnsiString='';
@@ -252,6 +255,7 @@ var
 	finished_processes:Word;
 	n:Word;
 	f: TextFile;
+	retry_counter: Integer;
 	
 begin
 	diskpart_script := IncludeTrailingPathDelimiter(GetEnvironmentVariable('TEMP'))+'mebdd_worker_'+IntToStr(GetProcessID)+'.txt';
@@ -285,17 +289,31 @@ begin
 	parameters.Add(diskpart_script);
 	cmdline[0].parameters := parameters;
 	
-	// Run processes
-	finished_processes := run_processes_count(1, cmdline, 'exit_code:0', '');
+	// Run processes in a repeat loop
+	retry_counter := 0;
 	
+	repeat
+		// Increase retry counter + write to log
+		Inc(retry_counter);
+		proc_log_string('Retry '+IntToStr(retry_counter)+':');
+		
+		// Run process
+		finished_processes := run_processes_count(1, cmdline, 'exit_code:0', '');
+	
+		if finished_processes = 1 then
+			clear_partition_tables := True
+		else
+			clear_partition_tables := False;
+
+	until ((retry_counter > RETRIES) or clear_partition_tables);
+	
+	if (not clear_partition_tables) then
+		proc_log_string('All retries failed.');
+
 	// Delete DISKPART script
 	If not DeleteFile(diskpart_script) Then
 		proc_log_string('Warning: failed to delete temporary file "'+diskpart_script+'"');
 
-	if finished_processes = 1 then
-		clear_partition_tables := True
-	else
-		clear_partition_tables := False;
 end;
 
 function write_disk_image(drive_count:Word; drives:Tdrive_string_arr; image_file:AnsiString):Boolean;
@@ -304,6 +322,7 @@ var
 	parameters:TStringList;
 	finished_processes:Word;
 	n:Word;
+	retry_counter: Integer;
 	
 begin
 	for n:=0 to drive_count-1 do
@@ -316,13 +335,27 @@ begin
 			dd_cmdline[n].parameters := parameters;
 		end;
 	
-	finished_processes := run_processes_count(drive_count, dd_cmdline, '', '.*Error.*');
-	
-	if finished_processes = drive_count then
-		write_disk_image := True
-	else
-		write_disk_image := False;
 
+	// Run processes in a repeat loop
+	retry_counter := 0;
+	
+	repeat
+		// Increase retry counter + write to log
+		Inc(retry_counter);
+		proc_log_string('Retry '+IntToStr(retry_counter)+':');
+		
+		// Run processes
+		finished_processes := run_processes_count(drive_count, dd_cmdline, '', '.*Error.*');
+	
+		if finished_processes = drive_count then
+			write_disk_image := True
+		else
+			write_disk_image := False;
+			
+	until ((retry_counter > RETRIES) or write_disk_image);
+
+	if (not write_disk_image) then
+		proc_log_string('All retries failed.');
 end;
 
 function verify_disk_image(drive_count:Word; drives:Tdrive_string_arr; image_path: AnsiString; digest:AnsiString):Boolean;
@@ -332,6 +365,7 @@ var
 	finished_processes:Word;
 	n:Word;
 	file_size: LongInt;
+	retry_counter: Integer;
 	
 begin
 	for n:=0 to drive_count-1 do
@@ -353,13 +387,25 @@ begin
 			dd_cmdline[n].parameters := parameters;
 		end;
 	
-	finished_processes := run_processes_count(drive_count, dd_cmdline, digest+' ', '');
+	// Run processes in a repeat loop
+	retry_counter := 0;
 	
-	if finished_processes = drive_count then
-		verify_disk_image := True
-	else
-		verify_disk_image := False;
+	repeat
+		// Increase retry counter + write to log
+		Inc(retry_counter);
+		proc_log_string('Retry '+IntToStr(retry_counter)+':');
+		
+		// Run processes
+		finished_processes := run_processes_count(drive_count, dd_cmdline, digest+' ', '');
+	
+		if finished_processes = drive_count then
+			verify_disk_image := True
+		else
+			verify_disk_image := False;
+	until ((retry_counter > RETRIES) or verify_disk_image);
 
+	if (not verify_disk_image) then
+		proc_log_string('All retries failed.');
 end;
 
 
