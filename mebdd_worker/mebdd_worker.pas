@@ -363,14 +363,20 @@ var
 	dd_cmdline:Texec_params_array;
 	parameters:TStringList;
 	finished_processes:Word;
+	temporary_filename: Tdrive_string_arr;
 	n:Word;
 	file_size: LongInt;
 	retry_counter: Integer;
 	
 begin
+	// Calculate image size in order to know how many bytes we read from the USB
+	file_size := get_file_size(image_path);
+
 	for n:=0 to drive_count-1 do
 		begin
-			file_size := get_file_size(image_path);
+			// Create temporary name for this image
+			
+			temporary_filename[n] := IncludeTrailingPathDelimiter(GetEnvironmentVariable('TEMP'))+'mebdd_worker_image_'+IntToStr(GetProcessID)+'_'+IntToStr(n)+'.img';
 			
 			dd_cmdline[n].executable := path_cmd;
 			parameters := TStringList.Create;
@@ -378,11 +384,12 @@ begin
 			parameters.Add('"');
 			parameters.Add(IncludeTrailingPathDelimiter(path_mebdd)+'dd.exe');
 			parameters.Add('if="'+drives[n]+'"');
-			parameters.Add('of=-');
+			parameters.Add('of="'+temporary_filename[n]+'"');
 			parameters.Add('bs='+IntToStr(file_size));
 			parameters.Add('count=1');
-			parameters.Add('|');
+			parameters.Add('&');
 			parameters.Add(IncludeTrailingPathDelimiter(path_mebdd)+'md5.exe');
+			parameters.Add(temporary_filename[n]);
 			parameters.Add('"');
 			dd_cmdline[n].parameters := parameters;
 		end;
@@ -406,6 +413,14 @@ begin
 
 	if (not verify_disk_image) then
 		proc_log_string('All retries failed.');
+	
+	// Delete temporary files
+	for n:=0 to drive_count-1 do
+		begin
+			// Delete temporary file
+			if (not DeleteFile(temporary_filename[n])) then
+				proc_log_string('Warning: Could not delete temporary image file '+temporary_filename[n]);
+		end;
 end;
 
 
