@@ -6,18 +6,6 @@ program mebdd_worker;
 
 uses Sysutils, Classes, RegExpr, mebdd_worker_reg, mebdd_worker_proc, mebdd_worker_groups;
 
-(*
-type
-	Tdrive_string_arr = Array [0..99] of AnsiString;
-*)
-	
-(*
-	Texec_params = Record
-		executable : AnsiString;
-		parameters : TStrings;
-	end;
-*)
-
 const
 	RETRIES = 3;
 	

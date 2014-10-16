@@ -28,16 +28,23 @@
 	Const REG_IMAGE_KEY = "LastImagePath"
 	Const REG_INSTALL_PATH = "SOFTWARE\MEB Finland\mebdd"
 	Const REG_INSTALL_KEY = "path_mebdd"
+	Const REG_32BIT_MD5_PATH = "Software\MEB Finland\mebdd"
+	Const REG_32BIT_MD5_KEY = "32bitMD5"
+	Const REG_64BIT_MD5_PATH = "Software\MEB Finland\mebdd"
+	Const REG_64BIT_MD5_KEY = "64bitMD5"
 	Const LOCALDATA_PATH = "MEB Finland\mebdd"
 	Const DOWNLOAD_32BIT = "https://digabi.fi/32bit"
 	Const DOWNLOAD_64BIT = "https://digabi.fi/64bit"
+	Const DOWNLOAD_32BIT_MD5 = "https://digabi.fi/32bit/md5"
+	Const DOWNLOAD_64BIT_MD5 = "https://digabi.fi/64bit/md5"
 	
 	' NOTE! NOTE! We have to give the FULL PATH for these command-line tools.
 	' Please make sure you change these in case you relocate the utilities.
-	Dim BIN_CURL, BIN_MEBDD_WORKER
+	Dim BIN_CURL, BIN_MEBDD_WORKER, BIN_MEBMD5
 	
 	BIN_CURL = ReadMEBDDInstallationPath() & "\curl.exe"
 	BIN_MEBDD_WORKER = ReadMEBDDInstallationPath() & "\mebdd_worker.exe"
+	BIN_MEBMD5 = ReadMEBDDInstallationPath() & "\mebmd5.exe"
 	
 	Function GetEnvironmentString(strVariableName)
 		Dim objShell
@@ -45,18 +52,30 @@
 		GetEnvironmentString = objShell.ExpandEnvironmentStrings("%" & strVariableName & "%")
 	End Function
 
-	Function ReadLastImagePath ()
-		Dim oReg, strKeyPath, strValue
+	Function ReadRegKeyHKCU (strRegPath, strRegKey)
+		Dim oReg, strValue
 		Set oReg=GetObject("winmgmts:{impersonationLevel=impersonate}!\\.\root\default:StdRegProv")
-		oReg.GetStringValue HKEY_CURRENT_USER,REG_IMAGE_PATH,REG_IMAGE_KEY,strValue
-		ReadLastImagePath = strValue
+		oReg.GetStringValue HKEY_CURRENT_USER,strRegPath,strRegKey,strValue
+		ReadRegKeyHKCU = strValue
+	End Function
+	
+	Function WriteRegKeyHKCU (strRegPath, strRegKey, strValue)
+		Dim oReg
+		Set oReg=GetObject("winmgmts:{impersonationLevel=impersonate}!\\.\root\default:StdRegProv")
+		oReg.CreateKey HKEY_CURRENT_USER, strRegPath
+		oReg.SetStringValue HKEY_CURRENT_USER, strRegPath, strRegKey, strValue
+	
+		' Currently returns always true
+		WriteRegKeyHKCU = True
+	End Function
+	
+	Function ReadLastImagePath ()
+		ReadLastImagePath = ReadRegKeyHKCU(REG_IMAGE_PATH, REG_IMAGE_KEY)
 	End Function
 	
 	Function WriteLastImagePath (strNewPath)
-		Dim oReg, strKeyPath, strValue
-		Set oReg=GetObject("winmgmts:{impersonationLevel=impersonate}!\\.\root\default:StdRegProv")
-		oReg.CreateKey HKEY_CURRENT_USER, REG_IMAGE_PATH
-		oReg.SetStringValue HKEY_CURRENT_USER, REG_IMAGE_PATH, REG_IMAGE_KEY, strNewPath
+		Dim boolResult
+		boolResult = WriteRegKeyHKCU(REG_IMAGE_PATH, REG_IMAGE_KEY, strNewPath)
 	End Function
 	
 	Function GetLocalImageDirectoryPath ()
@@ -279,8 +298,38 @@
 		GetSelectedDrives = arrSelectedDrives
 	End Function
 	
+	Function FileMD5IsEqual(strFilePath, strMD5)
+		Dim strMD5Cmd, exitcode, boolResult
+		
+		strMD5Cmd = Chr(34) & BIN_MEBMD5 & Chr(34) & " " & Chr(34) & strFilePath & Chr(34) & " " & strMD5
+		
+		Dim shell
+		Set shell = CreateObject("WScript.Shell")
+
+		AppendWriteStatus("MD5SUM: " & strMD5Cmd)
+		AppendWriteStatus("Odota, tarkistetaan ladattua levynkuvaa...")
+		
+		ButtonsDisable
+		exitcode = shell.Run(strMD5Cmd, 0, TRUE)
+		ButtonsEnable
+
+		boolResult = False
+		
+		If exitcode = 0 Then
+			' Error in MEBMD5
+			AppendWriteStatus("Varoitus! MEBMD5-komento tuotti virheen: " & strMD5Cmd)
+		End If
+		
+		If exitcode = 1 Then
+			' Sums match
+			boolResult = True
+		End If
+		
+		FileMD5IsEqual = boolResult
+	End Function
+	
 	Function DownloadImage (strURL, strDestinationFile)
-		Dim strCurlCmd, exitcode
+		Dim strCurlCmd, exitcode, boolResult
 		
 		strCurlCmd = Chr(34) & BIN_CURL & Chr(34) & " -L -k """ & strURL & """ -o """ & strDestinationFile & Chr(34)
 		
@@ -288,6 +337,10 @@
 		Set shell = CreateObject("WScript.Shell")
 		AppendWriteStatus("Levynkuvan lataus käynnistetty.")
 		AppendWriteStatus("cURL: " & strCurlCmd)
+		
+		' FIXME: during debug, always return True
+		DownloadImage = True
+		Exit Function
 
 		ButtonsDisable
 		exitcode = shell.Run(strCurlCmd, 1, TRUE)
@@ -295,32 +348,83 @@
 		
 		If (exitcode = 0) Then
 			AppendWriteStatus("Levynkuvan lataus onnistui")
+			boolResult = True
 		Else
 			AppendWriteStatus("Levynkuvan lataus epäonnistui, virhekoodi #" & exitcode)
+			boolResult = False
 		End If
+		
+		DownloadImage = boolResult
 	End Function
 	
+	Function DownloadMD5 (strURL, strKeyPath, strKeyName)
+		Dim boolResult, oBrowser, strMD5
+		
+		Set oBrowser = CreateObject("MSXML2.XMLHTTP")
+		oBrowser.open "GET", strURL, False
+		oBrowser.send
+		
+		If oBrowser.Status = 200 Then
+			' Everything was OK
+			strMD5 = oBrowser.responseText
+			
+			' Store MD5 to given registry
+			boolResult = WriteRegKeyHKCU(strKeyPath, strKeyName, strMD5)
+		Else
+			boolResult = False
+		End If
+		
+		DownloadMD5 = boolResult
+	End Function
 	
 	Sub Download32
-		Dim strDestinationPath, strResult
+		Dim strDestinationPath, boolResult
 		
 		strDestinationPath = GetLocalImageDirectoryPath() & "DigabiOS-32bit.iso"
 		
-		strResult = DownloadImage(DOWNLOAD_32BIT, strDestinationPath)
+		boolResult = DownloadImage(DOWNLOAD_32BIT, strDestinationPath)
 		
-		objCurrentImage.InnerHTML = strDestinationPath
-		CheckImagePath
+		If boolResult Then
+			objCurrentImage.InnerHTML = strDestinationPath
+			CheckImagePath
+			
+			boolResult = DownloadMD5(DOWNLOAD_32BIT_MD5, REG_32BIT_MD5_PATH, REG_32BIT_MD5_KEY)
+			
+			' Verify file MD5 to downloaded MD5
+			If FileMD5IsEqual(strDestinationPath, ReadRegKeyHKCU(REG_32BIT_MD5_PATH, REG_32BIT_MD5_KEY)) Then
+				' Success
+				AppendWriteStatus("Ladattu levynkuva on virheetön.")
+			Else
+				' Fail
+				AppendWriteStatus("Varoitus! Ladatussa levynkuvassa on virheitä. Lataa tiedosto uudelleen.")
+				MsgBox "Ladatussa levynkuvassa on virheitä. Lataa tiedosto uudelleen.", 16, "Virhe"
+			End If
+		End If
 	End Sub
 	
 	Sub Download64
-		Dim strDestinationPath, strResult
+		Dim strDestinationPath, boolResult
 		
 		strDestinationPath = GetLocalImageDirectoryPath() & "DigabiOS-64bit.iso"
 		
-		strResult = DownloadImage(DOWNLOAD_64BIT, strDestinationPath)
+		boolResult = DownloadImage(DOWNLOAD_64BIT, strDestinationPath)
 
-		objCurrentImage.InnerHTML = strDestinationPath
-		CheckImagePath
+		If boolResult Then
+			objCurrentImage.InnerHTML = strDestinationPath
+			CheckImagePath
+			
+			boolResult = DownloadMD5(DOWNLOAD_64BIT_MD5, REG_64BIT_MD5_PATH, REG_64BIT_MD5_KEY)
+			
+			' Verify file MD5 to downloaded MD5
+			If FileMD5IsEqual(strDestinationPath, ReadRegKeyHKCU(REG_64BIT_MD5_PATH, REG_64BIT_MD5_KEY)) Then
+				' Success
+				AppendWriteStatus("Ladattu levynkuva on virheetön.")
+			Else
+				' Fail
+				AppendWriteStatus("Varoitus! Ladatussa levynkuvassa on virheitä. Lataa tiedosto uudelleen.")
+				MsgBox "Ladatussa levynkuvassa on virheitä. Lataa tiedosto uudelleen.", 16, "Virhe"
+			End If
+		End If
 	End Sub
 	
     Sub SetCurrentImage
@@ -368,7 +472,7 @@
 		arrSelectedDrives = GetSelectedDrives()
 		
 		If (UBound(arrSelectedDrives) = 0) Then
-			MsgBox "Valitse USB-muistitikku", 16, "Virhe"
+			MsgBox "Valitse USB-muisti", 16, "Virhe"
 			Exit Sub
 		End If
 		
@@ -484,7 +588,7 @@
 	</td>
 </tr>
 
-<tr><td colspan="2"><h1>Vaihe 2: Valitse käytettävä USB-muistitikku</h1></td></tr>
+<tr><td colspan="2"><h1>Vaihe 2: Valitse käytettävä USB-muisti</h1></td></tr>
 <tr>
 	<td id="objStep2Logo" width="100px"></td>
 	<td>
@@ -496,13 +600,13 @@
 	</td>
 </tr>
 
-<tr><td colspan="2"><h1>Vaihe 3: Kirjoita tiedosto USB-muistitikulle</h1></td></tr>
+<tr><td colspan="2"><h1>Vaihe 3: Kirjoita tiedosto USB-muistille</h1></td></tr>
 <tr>
 	<td id="objStep3Logo" width="100px"></td>
 	<td>
-	<p><input type="checkbox" id="checkboxVerify" name="checkboxVerify" checked>Tarkista kirjoitettu USB-muistitikku kirjoitusvirheiden varalta</p>
-	<p>Kun olet valinnut kopioitavan levynkuvan ja käytettävän USB-muistitikun, napsauta allaolevasta painikkeesta.</p>
-	<input type="button" id="buttonWriteImage" value="Käynnistä kirjoitus" onclick="WriteImage('normal')">
+	<p><input type="checkbox" id="checkboxVerify" name="checkboxVerify" checked>Tarkista kirjoitettu USB-muisti kirjoitusvirheiden varalta</p>
+	<p>Kun olet valinnut kopioitavan levynkuvan ja käytettävän USB-muistin, napsauta allaolevasta painikkeesta.</p>
+	<input type="button" id="buttonWriteImage" value="Käynnistä USB-muistin kirjoitus" onclick="WriteImage('normal')">
 	<br/><br/>
 	<span id="objWriteStatus"></span>
 	</td>
