@@ -30,6 +30,17 @@ OpenSSL
 Muutokset
 ---------
 
+1.2a (17.10.2014)
+- helposti skriptattava mebmd5-työkalu tiedostojen MD5-summien laskemiseen
+- mebdd osaa verifioida lataamiensa tiedostojen eheyden MD5-summan avulla
+- mebdd worker osaa verifioida kirjoittamansa USB-muistin eheyden MD5-summan
+  avulla
+- virheen sattuessa mebdd worker yrittää levyoperaatioita muutaman kerran
+  uudelleen
+- mebdd worker tekee DISKPART-operaatiot peräkkäin, joka näyttäisi vähentävän
+  erilaisia virhetilanteita
+- pieniä käyttöliittymämuutoksia
+
 1.1c (30.9.2014)
 - mebdd worker osaa nyt oikeasti luoda rekisteriarvon myös 32-bittisessä
   käyttöjärjestelmässä

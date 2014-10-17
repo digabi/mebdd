@@ -14,6 +14,8 @@
 		.radio_disk_warning { font-family: Courier; color: red; }
 		.file_path { font-family: Courier; }
 		.header { font-family: Arial; font-size: 130%; color: white; }
+		.cellIcon { vertical-align: top; width: 100px; }
+		.cellText { vertical-align: top; }
 	</style>
 </head>
 
@@ -220,6 +222,9 @@
 		Dim n
 		n = 0
 		
+		' Clear write status icon
+		SetWriteStatus(0)
+		
 		' Reset radio buttons
 		objRadioButtonArea.InnerHTML = ""
 		
@@ -338,10 +343,6 @@
 		AppendWriteStatus("Levynkuvan lataus käynnistetty.")
 		AppendWriteStatus("cURL: " & strCurlCmd)
 		
-		' FIXME: during debug, always return True
-		DownloadImage = True
-		Exit Function
-
 		ButtonsDisable
 		exitcode = shell.Run(strCurlCmd, 1, TRUE)
 		ButtonsEnable
@@ -380,6 +381,9 @@
 	Sub Download32
 		Dim strDestinationPath, boolResult
 		
+		' Clear write status icon
+		SetWriteStatus(0)
+		
 		strDestinationPath = GetLocalImageDirectoryPath() & "DigabiOS-32bit.iso"
 		
 		boolResult = DownloadImage(DOWNLOAD_32BIT, strDestinationPath)
@@ -404,6 +408,9 @@
 	
 	Sub Download64
 		Dim strDestinationPath, boolResult
+		
+		' Clear write status icon
+		SetWriteStatus(0)
 		
 		strDestinationPath = GetLocalImageDirectoryPath() & "DigabiOS-64bit.iso"
 		
@@ -434,6 +441,9 @@
 	
 	Sub openImageFile
 		Dim s, i2
+		
+		' Clear write status icon
+		SetWriteStatus(0)
 		
 		s = Dlg.openfiledlg(CStr(GetLocalImageDirectoryPath() & "*.iso"), , , CStr("Valitse tiedosto"))  
 		If (Len(s) > 0) Then
@@ -520,6 +530,7 @@
 		ButtonsEnable
 
 		If (exitcode = 255) Then
+			SetWriteStatus(1)
 			If strFunction = "zero" Then
 				AppendWriteStatus("Levynkuvan kirjoitus (USB-muistin tyhjennys) onnistui")
 				MsgBox "USB-muisti on tyhjennetty. Irrota ja liitä muisti takaisin. Hyväksy ehdotus alustuksesta (formatoinnista).", 64
@@ -527,6 +538,7 @@
 				AppendWriteStatus("Levynkuvan kirjoitus onnistui")
 			End If
 		Else
+			SetWriteStatus(-1)
 			AppendWriteStatus("Levynkuvan kirjoitus epäonnistui, virhekoodi #" & exitcode & _
 				" <a href='file://" & GetEnvironmentString("TEMP") & "\mebdd_worker.txt'>Avaa lokitiedosto</a>")
 		End If
@@ -554,8 +566,29 @@
 		End If
 	End Sub
 	
+	Sub SetWriteStatus (intStatus)
+		' Status = 0 : grey logo (neutral)
+		' Status < 0 : red logo (failed)
+		' Status > 0 : green logo (success)
+		
+		If intStatus = 0 Then
+			objStep3Logo.InnerHTML = "<img src=""marssiva_kukko_harmaa.png"">"
+		End If
+		
+		If intStatus < 0 Then
+			objStep3Logo.InnerHTML = "<img src=""marssiva_kukko_punainen.png"">"
+		End If
+		
+		If intStatus > 0 Then
+			objStep3Logo.InnerHTML = "<img src=""marssiva_kukko_vihrea.png"">"
+		End If
+	End Sub
+	
 	Function AppendWriteStatus (strNewMessage)
 		objWriteStatus.InnerHTML = Time & " : " & strNewMessage & "<br/>" & objWriteStatus.InnerHTML
+		
+		' Return always TRUE (Why this is not a sub?)
+		AppendWriteStatus = True
 	End Function
 	
 	Sub Window_onLoad
@@ -567,6 +600,9 @@
 		
 		' Set drive options
 		PopulateDrives
+		
+		' Set write status to neutral
+		SetWriteStatus(0)
 	End Sub
 	
 </script>
@@ -575,23 +611,23 @@
 <table>
 <tr><td colspan="2"><h1>Vaihe 1: Lataa tai valitse tarvittava tiedosto</h1></td></tr>
 <tr>
-	<td id="objStep1Logo" width="100px"></td>
-	<td>
+	<td id="objStep1Logo" class="cellIcon"></td>
+	<td class="cellText">
 	<p>Tarvittavan tiedoston tiedostopääte on .iso. Voit ladata tiedoston selaimella tai käyttämällä alla olevia painikkeita. Vaihtoehtoisesti voit käyttää jo lataamaasi tiedostoa.</p>
 	<p>Valittu tiedosto: <span class="file_path"><span id="objCurrentImage"></span></span></p>
 	<p>Hae uusi tiedosto:
 	<ul>
 	<li>Koneellasi ei ole tiedostoa: <input type="button" id="buttonDownload64" value="Lataa 64-bittinen versio" onclick="Download64()"></li>
 	<li>Koneellasi ei ole tiedostoa: <input type="button" id="buttonDownload32" value="Lataa 32-bittinen versio" onclick="Download32()"> - kokeile tätä, jos kone ei käynnisty 64-bittisellä versiolla</li>
-	<li>Koneellasi on jo tiedosto: <!-- <input type="file" id="formImageName" onchange="setCurrentImage()"> --><input type="hidden" id="formImageName" value=""><input type="button" id="buttonOpenFile" value="Avaa .iso-tiedosto" onClick="openImageFile()"></li>
+	<li>Koneellasi on jo tiedosto: <input type="hidden" id="formImageName" value=""><input type="button" id="buttonOpenFile" value="Avaa .iso-tiedosto" onClick="openImageFile()"></li>
 	</ul>
 	</td>
 </tr>
 
 <tr><td colspan="2"><h1>Vaihe 2: Valitse käytettävä USB-muisti</h1></td></tr>
 <tr>
-	<td id="objStep2Logo" width="100px"></td>
-	<td>
+	<td id="objStep2Logo" class="cellIcon"></td>
+	<td class="cellText">
 	<p>Valitse yksi tai useampi USB-muisti, johon haluat kirjoittaa DigabiOS:n. Jos et ole vielä syöttänyt USB-muistia koneeseen, tee se nyt ja napsauta Etsi USB-muistit -painiketta.</p>
 	<span class="radio_disk_normal">
 	<span id="objRadioButtonArea"></span>
@@ -602,8 +638,8 @@
 
 <tr><td colspan="2"><h1>Vaihe 3: Kirjoita tiedosto USB-muistille</h1></td></tr>
 <tr>
-	<td id="objStep3Logo" width="100px"></td>
-	<td>
+	<td id="objStep3Logo" class="cellIcon"></td>
+	<td class="cellText">
 	<p><input type="checkbox" id="checkboxVerify" name="checkboxVerify" checked>Tarkista kirjoitettu USB-muisti kirjoitusvirheiden varalta</p>
 	<p>Kun olet valinnut kopioitavan levynkuvan ja käytettävän USB-muistin, napsauta allaolevasta painikkeesta.</p>
 	<input type="button" id="buttonWriteImage" value="Käynnistä USB-muistin kirjoitus" onclick="WriteImage('normal')">
