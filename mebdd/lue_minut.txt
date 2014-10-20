@@ -30,6 +30,9 @@ OpenSSL
 Muutokset
 ---------
 
+1.2b (20.10.2014)
+- mebdd_worker käyttää MD5-summan laskemisess mebmd5:ttä
+
 1.2a (17.10.2014)
 - helposti skriptattava mebmd5-työkalu tiedostojen MD5-summien laskemiseen
 - mebdd osaa verifioida lataamiensa tiedostojen eheyden MD5-summan avulla

@@ -207,7 +207,7 @@ begin
 	if digest = '' then
 		begin
 			// Run MD5 as an external process
-			cmdline[0].executable := IncludeTrailingPathDelimiter(path_mebdd)+'md5.exe';
+			cmdline[0].executable := IncludeTrailingPathDelimiter(path_mebdd)+'mebmd5.exe';
 			parameters := TStringList.Create;
 			parameters.Add(path_image);
 			cmdline[0].parameters := parameters;
@@ -216,7 +216,7 @@ begin
 			
 			// Search the MD5 digest from the output
 			RegexObj := TRegExpr.Create;
-			RegexObj.Expression := '^([0123456789abcdef]+) ';
+			RegexObj.Expression := '^([0123456789abcdef]+)';
 			RegexObj.ModifierI := True;
 			if RegexObj.Exec(process_output[0]) then
 				begin
@@ -376,8 +376,9 @@ begin
 			parameters.Add('bs='+IntToStr(file_size));
 			parameters.Add('count=1');
 			parameters.Add('&');
-			parameters.Add(IncludeTrailingPathDelimiter(path_mebdd)+'md5.exe');
+			parameters.Add(IncludeTrailingPathDelimiter(path_mebdd)+'mebmd5.exe');
 			parameters.Add(temporary_filename[n]);
+			parameters.Add(digest);
 			parameters.Add('"');
 			dd_cmdline[n].parameters := parameters;
 		end;
@@ -391,7 +392,7 @@ begin
 		proc_log_string('Retry '+IntToStr(retry_counter)+':');
 		
 		// Run processes
-		finished_processes := run_processes_count(drive_count, dd_cmdline, digest+' ', '');
+		finished_processes := run_processes_count(drive_count, dd_cmdline, 'exit_code:1', '');
 	
 		if finished_processes = drive_count then
 			verify_disk_image := True
