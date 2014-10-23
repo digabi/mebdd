@@ -1,3 +1,7 @@
+@echo off
+rem Compile mebmd5.pas
+rem Some day this will be replaced by a decent Makefile (fpmake?)
+
 del *.o
 del *.ppu
 

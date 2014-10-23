@@ -77,6 +77,8 @@ begin
 	Writeln('  the calculated sum with the given. If the sums match');
 	Writeln('  exits with code 1, otherwise 2.');
 	Writeln('Exit code 0 signals an error.');
+	Writeln('');
+	Writeln('mebmd5 build ' + {$I %DATE%} + ' ' + {$I %TIME%});
 	
 	Halt(0);
 end.

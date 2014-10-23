@@ -370,11 +370,10 @@ begin
 			parameters := TStringList.Create;
 			parameters.Add('/c');
 			parameters.Add('"');
-			parameters.Add(IncludeTrailingPathDelimiter(path_mebdd)+'dd.exe');
-			parameters.Add('if="'+drives[n]+'"');
-			parameters.Add('of="'+temporary_filename[n]+'"');
-			parameters.Add('bs='+IntToStr(file_size));
-			parameters.Add('count=1');
+			parameters.Add(IncludeTrailingPathDelimiter(path_mebdd)+'mebdd_read.exe');
+			parameters.Add(drives[n]);
+			parameters.Add(IntToStr(file_size));
+			parameters.Add(temporary_filename[n]);
 			parameters.Add('&');
 			parameters.Add(IncludeTrailingPathDelimiter(path_mebdd)+'mebmd5.exe');
 			parameters.Add(temporary_filename[n]);
@@ -421,7 +420,7 @@ var
 begin
 	// Init log file
 	proc_log_filename(IncludeTrailingPathDelimiter(GetEnvironmentVariable('TEMP'))+'mebdd_worker.txt');
-	proc_log_string('Execution started');
+	proc_log_string('Execution started - mebdd_worker build ' + {$I %DATE%} + ' ' + {$I %TIME%});
 	
 	// Check if user is admin
 	if not UserInGroup(DOMAIN_ALIAS_RID_ADMINS) then
