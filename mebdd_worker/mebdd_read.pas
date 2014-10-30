@@ -8,7 +8,6 @@ Uses SysUtils, Classes, Windows;
 Function copy_disk_to_file (disk_name:AnsiString; disk_bytes:Int64; file_name: AnsiString):Boolean;
 
 Var
-	disk_name_wc: Array [0..MAX_PATH] of WideChar;
 	disk_handle: THandle;
 	file_handle: TFileStream;
 	error_code: Int64;
@@ -16,9 +15,8 @@ Var
 	buffer: array [0..65535] of Byte;   // 262144 (240Kb) or 131072 (120Kb buffer) or 65536 (64Kb buffer)
 
 begin
-	StringToWideChar(disk_name, disk_name_wc, MAX_PATH);
-	
-	disk_handle := CreateFileW(PWideChar(disk_name_wc), FILE_READ_DATA,
+	// Words with Windows 7 32 bit, Windows 8 64bit
+	disk_handle := CreateFile(PChar(disk_name), GENERIC_READ,
 		FILE_SHARE_READ, nil, OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, 0);
 
 	if disk_handle = INVALID_HANDLE_VALUE then
