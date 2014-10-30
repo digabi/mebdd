@@ -362,12 +362,12 @@ begin
 
 	for n:=0 to drive_count-1 do
 		begin
-			// Create temporary name for this image
-			
-			temporary_filename[n] := IncludeTrailingPathDelimiter(GetEnvironmentVariable('TEMP'))+'mebdd_worker_image_'+IntToStr(GetProcessID)+'_'+IntToStr(n)+'.img';
-			
-			dd_cmdline[n].executable := path_cmd;
+			dd_cmdline[n].executable := IncludeTrailingPathDelimiter(path_mebdd)+'mebdd_read.exe';
 			parameters := TStringList.Create;
+
+			(*
+			1) copy to file 2) calculate md5
+			
 			parameters.Add('/c');
 			parameters.Add('"');
 			parameters.Add(IncludeTrailingPathDelimiter(path_mebdd)+'mebdd_read.exe');
@@ -379,6 +379,12 @@ begin
 			parameters.Add(temporary_filename[n]);
 			parameters.Add(digest);
 			parameters.Add('"');
+			*)
+
+			parameters.Add(drives[n]);
+			parameters.Add(IntToStr(file_size));
+			parameters.Add(digest);
+
 			dd_cmdline[n].parameters := parameters;
 		end;
 	
@@ -401,14 +407,6 @@ begin
 
 	if (not verify_disk_image) then
 		proc_log_string('All retries failed.');
-	
-	// Delete temporary files
-	for n:=0 to drive_count-1 do
-		begin
-			// Delete temporary file
-			if (not DeleteFile(temporary_filename[n])) then
-				proc_log_string('Warning: Could not delete temporary image file '+temporary_filename[n]);
-		end;
 end;
 
 

@@ -1,5 +1,5 @@
 <head>
-<title>MEB DD 1.2e</title>
+<title>MEB DD 1.2f</title>
 <HTA:APPLICATION 
      APPLICATIONNAME="MEB DD"
      SCROLL="yes"
@@ -106,44 +106,6 @@
 		oReg.GetStringValue HKEY_LOCAL_MACHINE,REG_INSTALL_PATH,REG_INSTALL_KEY,strValue
 		ReadMEBDDInstallationPath = strValue
 	End Function
-
-	' Make sure that we have enough free disk space for verify process
-	Function EnoughFreeDiskSpace (strImageFile, intDriveCount)
-		Dim objFSO, objWMI, objFile, objDisk, bReturn, intImageSize, intDiskFree, intSpaceRequired, strTempPath
-		
-		Set objFSO = CreateObject("Scripting.FileSystemObject")
-		If (objFSO.FileExists(strImageFile)) Then
-			' Image file exists
-			
-			' Get image size
-			Set objFile = objFSO.GetFile(strImageFile)
-			intImageSize = objFile.Size
-			
-			' Get free disk size in drive of %TEMP%
-			strTempPath = GetEnvironmentString("TEMP")
-			
-			' Get free disk size
-			Set objWMI = GetObject("winmgmts:")
-			Set objDisk = objWMI.Get("Win32_LogicalDisk.DeviceID='" & Left(strTempPath, InStr(strTempPath, ":")) & "'")
-			intDiskFree = CDbl(objDisk.FreeSpace)
-			
-			' Calculate required disk size (1% overhead for each copy)
-			intSpaceRequired = Round(intDriveCount * 1.01 * intImageSize)
-			
-			If (intDiskFree > intSpaceRequired) Then
-				' We have more space than is required
-				bReturn = True
-			Else
-				bReturn = False
-			End If
-		Else
-			' Image file does not exist
-			bReturn = False
-		End If
-		
-		EnoughFreeDiskSpace = bReturn
-	End Function
-	
 
 	' http://www.robvanderwoude.com/vbstech_folders_md.php
 	Sub CreateDirs( MyDirName )
@@ -498,15 +460,10 @@
 		End If
 		
 		If checkboxVerify.checked Then
-			' Make sure that we have enough free disk for verify process
-			If (Not EnoughFreeDiskSpace (strImageFile, UBound(arrSelectedDrives))) Then
-				MsgBox "Kovalevyllä ei ole riittävästi vapaata tilaa tarkistusta varten", 16, "Virhe"
-				Exit Sub
-			End If
-			
 			' Execute mebdd_worker with verify
 			strWorkerCmd = Chr(34) & BIN_MEBDD_WORKER & Chr(34) & " -v " & Chr(34) & strImageFile & Chr(34)
 		Else
+			' No verify this time
 			strWorkerCmd = Chr(34) & BIN_MEBDD_WORKER & Chr(34) & " " & Chr(34) & strImageFile & Chr(34)
 		End If
 		
