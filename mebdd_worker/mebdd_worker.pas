@@ -40,9 +40,9 @@ begin
 	file_is_readable := _result;
 end;
 
-function get_file_size(file_path:AnsiString):LongInt;
+function get_file_size(file_path:AnsiString):Int64;
 var
-	_result:LongInt;
+	_result:Int64;
 	f:File of Byte;
 
 begin	
@@ -53,7 +53,7 @@ begin
 		_result := FileSize(f);
 		Close(f);
 	except
-		// FIXME
+		_result := 0;
 	end;
 	
 	get_file_size := _result;
@@ -353,7 +353,7 @@ var
 	finished_processes:Word;
 	temporary_filename: Tdrive_string_arr;
 	n:Word;
-	file_size: LongInt;
+	file_size: Int64;
 	retry_counter: Integer;
 	
 begin

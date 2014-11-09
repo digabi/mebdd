@@ -92,7 +92,7 @@ end;
 
 Var
 	disk_path: AnsiString;
-	disk_bytes: LongInt;
+	disk_bytes: Int64;
 	digest_expected: AnsiString;
 	digest_disk: AnsiString;
 	
@@ -109,7 +109,7 @@ begin
 	digest_expected := Lowercase(ParamStr(3));
 	
 	// Get bytes from the command line
-	if not TryStrToInt(ParamStr(2), disk_bytes) then
+	if not TryStrToInt64(ParamStr(2), disk_bytes) then
 		begin
 			writeln('Error: ' + ParamStr(2) + ' is not a number');
 			writeln('');
