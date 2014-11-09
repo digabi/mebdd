@@ -1,5 +1,24 @@
 <head>
-<title>MEB DD 1.2f</title>
+<!--
+	MEBDD
+	
+	Copyright 2014 Matti Lattu and Matriculation Examination Board of Finland
+	
+	This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+	
+-->
+<title>MEB DD 1.3a</title>
 <HTA:APPLICATION 
      APPLICATIONNAME="MEB DD"
      SCROLL="yes"
@@ -16,173 +35,164 @@
 		.header { font-family: Arial; font-size: 130%; color: white; }
 		.cellIcon { vertical-align: top; width: 100px; }
 		.cellText { vertical-align: top; }
+		
+		.imageTableNormal { font-family: Arial; font-size: 12pt; background-color: white; }
+		.imageTableSelected { font-family: Arial; font-size: 12pt; background-color: grey; }
+		
+		.progressLayer { position: absolute; width: 200px; height: 200px; z-index: 2; left: 200px; top: 200px; margin-left: auto; margin-right: auto; background-color: #ffffff; border-style: solid; border-color: black; font-family: Arial; padding: 20px; }
 	</style>
 </head>
+
+<script language="VBScript" src="mebdd_windows.vbs"></script>
+<script language="VBScript" src="mebdd_backend.vbs"></script>
 
 <script language="VBScript">
 	Option Explicit
 	
-	Const HKEY_CURRENT_USER =  &H80000001
-	Const HKEY_LOCAL_MACHINE = &H80000002
-	Const KEY_QUERY_VALUE = &H0001
-
-	Const REG_IMAGE_PATH = "Software\MEB Finland\mebdd"
-	Const REG_IMAGE_KEY = "LastImagePath"
 	Const REG_INSTALL_PATH = "SOFTWARE\MEB Finland\mebdd"
 	Const REG_INSTALL_KEY = "path_mebdd"
-	Const REG_32BIT_MD5_PATH = "Software\MEB Finland\mebdd"
-	Const REG_32BIT_MD5_KEY = "32bitMD5"
-	Const REG_64BIT_MD5_PATH = "Software\MEB Finland\mebdd"
-	Const REG_64BIT_MD5_KEY = "64bitMD5"
+	Const REG_HKCU_PATH = "Software\MEB Finland\mebdd"
+	Const REG_LAST_TAG_KEY = "LastTag"
 	Const LOCALDATA_PATH = "MEB Finland\mebdd"
-	Const DOWNLOAD_32BIT = "https://digabi.fi/32bit"
-	Const DOWNLOAD_64BIT = "https://digabi.fi/64bit"
-	Const DOWNLOAD_32BIT_MD5 = "https://digabi.fi/32bit/md5"
-	Const DOWNLOAD_64BIT_MD5 = "https://digabi.fi/64bit/md5"
+	Const IMAGE_SOURCE_LEGEND = 0
+	Const IMAGE_SOURCE_DESCRIPTION = 1
+	Const IMAGE_SOURCE_URL_IMAGE = 2
+	Const IMAGE_SOURCE_URL_MD5 = 3
+	Const IMAGE_SOURCE_LOCAL_PATH = 4
+	Const IMAGE_SOURCE_MD5_REG_PATH = 5
+	Const IMAGE_SOURCE_MD5_REMOTE_REG_KEY = 6
+	Const IMAGE_SOURCE_MD5_LOCAL_REG_KEY = 7
 	
 	' NOTE! NOTE! We have to give the FULL PATH for these command-line tools.
 	' Please make sure you change these in case you relocate the utilities.
-	Dim BIN_CURL, BIN_MEBDD_WORKER, BIN_MEBMD5
+	Dim BIN_CURL, BIN_MEBDD_WORKER, BIN_MEBMD5, BIN_UNZIP
 	
-	BIN_CURL = ReadMEBDDInstallationPath() & "\curl.exe"
-	BIN_MEBDD_WORKER = ReadMEBDDInstallationPath() & "\mebdd_worker.exe"
-	BIN_MEBMD5 = ReadMEBDDInstallationPath() & "\mebmd5.exe"
+	BIN_CURL = Win_GetMEBDDInstallationPath() & "\curl.exe"
+	BIN_MEBDD_WORKER = Win_GetMEBDDInstallationPath() & "\mebdd_worker.exe"
+	BIN_MEBMD5 = Win_GetMEBDDInstallationPath() & "\mebmd5.exe"
+	BIN_UNZIP = Win_GetMEBDDInstallationPath() & "\unzip.exe"
 	
-	Function GetEnvironmentString(strVariableName)
-		Dim objShell
-		Set objShell = CreateObject("WScript.Shell")
-		GetEnvironmentString = objShell.ExpandEnvironmentStrings("%" & strVariableName & "%")
-	End Function
+	' Data for Image Sources
+	'  - tag names should contain only alphanumeric characters (a-z, A-Z, 0-9)
+	'  - tag 'local_image' is reserved for locally selected image file
+	'  - tag 'local_zero' is reserved for local zero image
+	
+	Dim IMAGE_SOURCE
+	Set IMAGE_SOURCE = CreateObject("Scripting.Dictionary")
+	' Koulutusverkossa olevat KTP & KOE
+	IMAGE_SOURCE.Add "digabiktp", Array("Digabi KTP", "Digabin koetilan palvelin (KTP), Digabi-kouluttajakurssi", "http://192.168.0.1/latest/ktp.zip", "http://192.168.0.1/latest/ktp.zip.md5", Win_GetLocalImageDirectoryPath() & "ktp.dd", REG_HKCU_PATH, "MD5_digabiktp_remote", "MD5_digabiktp_local")
+	IMAGE_SOURCE.Add "digabikoe", Array("Digabi KOE", "Digabin kokelaan päätelaite (KOE), Digabi-kouluttajakurssi", "http://192.168.0.1/latest/koe.zip", "http://192.168.0.1/latest/koe.zip.md5", Win_GetLocalImageDirectoryPath() & "koe.dd", REG_HKCU_PATH, "MD5_digabikoe_remote", "MD5_digabikoe_local")
+	' Koulutusverkossa olevat DigabiOS 64bit ja 32bit
+	IMAGE_SOURCE.Add "digabi64", Array("DigabiOS 64bit", "DigabiOS-demokäyttöjärjestelmä, 64 bittinen", "http://192.168.0.1/dos/digabios-64bit.iso", "http://192.168.0.1/dos/digabios-64bit.iso.md5", Win_GetLocalImageDirectoryPath() & "DigabiOS-64bit.iso", REG_HKCU_PATH, "MD5_digabi64_remote", "MD5_digabi64_local")
+	IMAGE_SOURCE.Add "digabi32", Array("DigabiOS 32bit", "DigabiOS-demokäyttöjärjestelmä, 32 bittinen", "http://192.168.0.1/dos/digabios-32bit.iso", "http://192.168.0.1/dos/digabios-32bit.iso.md5", Win_GetLocalImageDirectoryPath() & "DigabiOS-32bit.iso", REG_HKCU_PATH, "MD5_digabi32_remote", "MD5_digabi32_local")
+	' KTP & KOE
+	'IMAGE_SOURCE.Add "digabiktp", Array("Digabi KTP", "Digabin koetilan palvelin (KTP)", "http://kurko.digabi.fi/latest/ktp.zip", "http://kurko.digabi.fi/latest/ktp.zip.md5", Win_GetLocalImageDirectoryPath() & "Digabi-KTP.dd", REG_HKCU_PATH, "MD5_digabiktp_remote", "MD5_digabiktp_local")
+	'IMAGE_SOURCE.Add "digabikoe", Array("Digabi KOE", "Digabin kokelaan päätelaite (KOE)", "http://kurko.digabi.fi/latest/koe.zip", "http://kurko.digabi.fi/latest/koe.zip.md5", Win_GetLocalImageDirectoryPath() & "Digabi-KOE.dd", REG_HKCU_PATH, "MD5_digabikoe_remote", "MD5_digabikoe_local")
+	' DigabiOS demo
+	'IMAGE_SOURCE.Add "digabi64", Array("DigabiOS 64bit", "DigabiOS-demokäyttöjärjestelmä, 64 bittinen", "https://digabi.fi/64bit", "https://digabi.fi/64bit/md5", Win_GetLocalImageDirectoryPath() & "DigabiOS-64bit.dd", REG_HKCU_PATH, "MD5_digabi64_remote", "MD5_digabi64_local")
+	'IMAGE_SOURCE.Add "digabi32", Array("DigabiOS 32bit", "DigabiOS-demokäyttöjärjestelmä, 32 bittinen", "https://digabi.fi/32bit", "https://digabi.fi/32bit/md5", Win_GetLocalImageDirectoryPath() & "DigabiOS-32bit.dd", REG_HKCU_PATH, "MD5_digabi32_remote", "MD5_digabi32_local")
+	' Lokaalit testit
+	'IMAGE_SOURCE.Add "digabiktplocal", Array("Digabi KTP", "Digabin koetilan palvelin (KTP), paikallinen", "http://127.0.0.1:8080/ktp.zip", "http://127.0.0.1:8080/ktp.zip.md5", Win_GetLocalImageDirectoryPath() & "ktp.dd", REG_HKCU_PATH, "MD5_digabiktp_remote_localhost", "MD5_digabiktp_local_localhost")
+	'IMAGE_SOURCE.Add "digabikoelocal", Array("Digabi KOE", "Digabin kokelaan päätelaite (KOE), paikallinen", "http://127.0.0.1:8080/koe.zip", "http://127.0.0.1:8080/koe.zip.md5", Win_GetLocalImageDirectoryPath() & "koe.dd", REG_HKCU_PATH, "MD5_digabikoe_remote_localhost", "MD5_digabikoe_local_localhost")
+	' Do not change these
+	IMAGE_SOURCE.Add "local_zero", Array("Tyhjennä", "Valitse tämä, kun haluat tyhjentää USB-muistit", "", "", Win_GetMEBDDInstallationPath() & "\zero_image.iso", "", "", "")
+	IMAGE_SOURCE.Add "local_image", Array("Paikallinen tiedosto (.iso, .dd)", "<input type=""button"" id=""buttonOpenFile"" value=""Valitse tiedosto"" onClick=""AskImageFilePath()"">", "", "", "", "", "", "")
+	
+	Dim MEBDD_LOG_FILE_PATH
+	MEBDD_LOG_FILE_PATH = Win_GetEnvironmentString("TEMP") & "\mebdd.txt"
+	
+	Dim strCurrentImageTag
+	strCurrentImageTag = ""
 
-	Function ReadRegKeyHKCU (strRegPath, strRegKey)
-		Dim oReg, strValue
-		Set oReg=GetObject("winmgmts:{impersonationLevel=impersonate}!\\.\root\default:StdRegProv")
-		oReg.GetStringValue HKEY_CURRENT_USER,strRegPath,strRegKey,strValue
-		ReadRegKeyHKCU = strValue
-	End Function
+	Dim objTimerOnload, objTimerScandisks
 	
-	Function WriteRegKeyHKCU (strRegPath, strRegKey, strValue)
-		Dim oReg
-		Set oReg=GetObject("winmgmts:{impersonationLevel=impersonate}!\\.\root\default:StdRegProv")
-		oReg.CreateKey HKEY_CURRENT_USER, strRegPath
-		oReg.SetStringValue HKEY_CURRENT_USER, strRegPath, strRegKey, strValue
-	
-		' Currently returns always true
-		WriteRegKeyHKCU = True
-	End Function
-	
-	Function ReadLastImagePath ()
-		ReadLastImagePath = ReadRegKeyHKCU(REG_IMAGE_PATH, REG_IMAGE_KEY)
-	End Function
-	
-	Function WriteLastImagePath (strNewPath)
-		Dim boolResult
-		boolResult = WriteRegKeyHKCU(REG_IMAGE_PATH, REG_IMAGE_KEY, strNewPath)
-	End Function
-	
-	Function GetLocalImageDirectoryPath ()
-		Dim fso, strDestinationPath
+
+	' Append given message to MEBDD_LOG_FILE_PATH
+	Sub LogMessage (strMessage)
+		Dim objFSO, objFile
 		
-		strDestinationPath = GetEnvironmentString("LOCALAPPDATA") & "\" & LOCALDATA_PATH & "\"
-		
-		Set fso = CreateObject("Scripting.FileSystemObject") 
-		If (Not fso.FolderExists(strDestinationPath)) Then
-			CreateDirs(strDestinationPath)
-		End If
-		
-		GetLocalImageDirectoryPath = strDestinationPath
-	End Function
-	
-	Function ReadMEBDDInstallationPath ()
-		Dim oReg, strValue, bHasAccessRight
-		Set oReg=GetObject("winmgmts:{impersonationLevel=impersonate}!\\.\root\default:StdRegProv")
-
-		oReg.CheckAccess HKEY_LOCAL_MACHINE, REG_INSTALL_PATH, KEY_QUERY_VALUE, bHasAccessRight
-		
-		If bHasAccessRight = False Then
-			MsgBox "En voi lukea MEBDD-asennushakemiston osoitetta. Asenna ohjelma uudelleen."
-		End If
-		
-		oReg.GetStringValue HKEY_LOCAL_MACHINE,REG_INSTALL_PATH,REG_INSTALL_KEY,strValue
-		ReadMEBDDInstallationPath = strValue
-	End Function
-
-	' http://www.robvanderwoude.com/vbstech_folders_md.php
-	Sub CreateDirs( MyDirName )
-	' This subroutine creates multiple folders like CMD.EXE's internal MD command.
-	' By default VBScript can only create one level of folders at a time (blows
-	' up otherwise!).
-	'
-	' Argument:
-	' MyDirName   [string]   folder(s) to be created, single or
-	'                        multi level, absolute or relative,
-	'                        "d:\folder\subfolder" format or UNC
-	'
-	' Written by Todd Reeves
-	' Modified by Rob van der Woude
-	' http://www.robvanderwoude.com
-
-		Dim arrDirs, i, idxFirst, objFSO, strDir, strDirBuild
-
-		' Create a file system object
-		Set objFSO = CreateObject( "Scripting.FileSystemObject" )
-
-		' Convert relative to absolute path
-		strDir = objFSO.GetAbsolutePathName( MyDirName )
-
-		' Split a multi level path in its "components"
-		arrDirs = Split( strDir, "\" )
-
-		' Check if the absolute path is UNC or not
-		If Left( strDir, 2 ) = "\\" Then
-			strDirBuild = "\\" & arrDirs(2) & "\" & arrDirs(3) & "\"
-			idxFirst    = 4
-		Else
-			strDirBuild = arrDirs(0) & "\"
-			idxFirst    = 1
-		End If
-
-		' Check each (sub)folder and create it if it doesn't exist
-		For i = idxFirst to Ubound( arrDirs )
-			strDirBuild = objFSO.BuildPath( strDirBuild, arrDirs(i) )
-			If Not objFSO.FolderExists( strDirBuild ) Then
-				objFSO.CreateFolder strDirBuild
-			End if
-		Next
-
-		' Release the file system object
-		Set objFSO= Nothing
+		Set objFSO = CreateObject("Scripting.FileSystemObject")
+		' Open file for appending (8)
+		Set objFile = objFSO.OpenTextFile(MEBDD_LOG_FILE_PATH, 8, True)
+		objFile.WriteLine(Date & " " & Time & " : " & strMessage)
+		objFile.Close
 	End Sub
 	
-	' http://sogeeky.blogspot.fi/2007/04/vbscript-function-code-to-convert-bytes.html
-	Function ConvertSize(Size)
-		Dim CommaLocate, Suffix
+	' Retrieve all remote MD5 digests and store them to HKCU registry
+	Sub GetRemoteVersions
+		Dim strThisTag, strThisDigest
 		
-		Do While InStr(Size,",") 'Remove commas from size
-			CommaLocate = InStr(Size,",")
-			Size = Mid(Size,1,CommaLocate - 1) & _
-				Mid(Size,CommaLocate + 1,Len(Size) - CommaLocate)
-		Loop
+		For Each strThisTag in IMAGE_SOURCE
+			If IMAGE_SOURCE(strThisTag)(IMAGE_SOURCE_URL_MD5) <> "" Then
+				LogMessage("Retrieving MD5 digest from " & IMAGE_SOURCE(strThisTag)(IMAGE_SOURCE_URL_MD5))
+				strThisDigest = BEnd_DownloadMD5(IMAGE_SOURCE(strThisTag)(IMAGE_SOURCE_URL_MD5))
+				If strThisDigest = "" Then
+					' We have an error
+					LogMessage("Error while retrieving MD5 digest from " & IMAGE_SOURCE(strThisTag)(IMAGE_SOURCE_URL_MD5) & ": " & BEnd_LastError)
+				End If
+				
+				If not Win_WriteRegKeyHKCU(REG_HKCU_PATH, IMAGE_SOURCE(strThisTag)(IMAGE_SOURCE_MD5_REMOTE_REG_KEY), strThisDigest) Then
+					LogMessage("Failed to write to registry")
+				End If
+			End If
+		Next
+	End Sub
 
-		Suffix = " Bytes"
-		If Size >= 1024 Then suffix = " KB"
-		If Size >= 1048576 Then suffix = " MB"
-		If Size >= 1073741824 Then suffix = " GB"
-		If Size >= 1099511627776 Then suffix = " TB"
+	' Populates image selection table from IMAGE_SOURCE (hash array) to
+	' objImageSelectionTable (HTML object)
+	Sub PopulateImages
+		Dim strThisTag, strThisRow, strTable, strLocalDigest, strRemoteDigest
+		
+		strTable = "<table>"
+		
+		For Each strThisTag in IMAGE_SOURCE
+			strThisRow = "<tr id=""objImageTableRow_" & strThisTag & """ class=""imageTableNormal"">"
+			strThisRow = strThisRow & "<td>" & IMAGE_SOURCE(strThisTag)(IMAGE_SOURCE_LEGEND) & "</td>"
+			strThisRow = strThisRow & "<td>" & IMAGE_SOURCE(strThisTag)(IMAGE_SOURCE_DESCRIPTION) & "</td>"
+			
+			strLocalDigest = Win_ReadRegKeyHKCU(IMAGE_SOURCE(strThisTag)(IMAGE_SOURCE_MD5_REG_PATH), IMAGE_SOURCE(strThisTag)(IMAGE_SOURCE_MD5_LOCAL_REG_KEY))
+			strRemoteDigest = Win_ReadRegKeyHKCU(IMAGE_SOURCE(strThisTag)(IMAGE_SOURCE_MD5_REG_PATH), IMAGE_SOURCE(strThisTag)(IMAGE_SOURCE_MD5_REMOTE_REG_KEY))
+			
+			' Create action button
+			If (not Win_FileExists(IMAGE_SOURCE(strThisTag)(IMAGE_SOURCE_LOCAL_PATH)) and strThisTag <> "local_image") Then
+			
+				' The image file does not exist. Offer download.
+				
+				strThisRow = strThisRow & "<td><input type=""button""" & _
+					" id=""buttonSelect_" & strThisTag & """" & _
+					" onClick=""Download('" & strThisTag & "')"" value=""Lataa""></td>"
+			ElseIf (IMAGE_SOURCE(strThisTag)(IMAGE_SOURCE_MD5_REMOTE_REG_KEY) <> "" and strLocalDigest <> strRemoteDigest) Then
+				
+				' Remote image has different digest than local. Offer update (download).
+				
+				strThisRow = strThisRow & "<td><input type=""button""" & _
+					" id=""buttonSelect_" & strThisTag & """" & _
+					" onClick=""Download('" & strThisTag & "')"" value=""Päivitä""></td>"
+			Else
+			
+				' We have a good local image file. Offer select.
+				
+				strThisRow = strThisRow & "<td><input type=""button""" & _
+					" id=""buttonSelect_" & strThisTag & """" & _
+					" onClick=""SelectImage('" & strThisTag & "')"" value=""Valitse""></td>"
+			End If
+			
+			strThisRow = strThisRow & "</tr>"
+				
+			strTable = strTable & strThisRow
+		Next
+		
+		strTable = strTable & "</table>"
 
-		Select Case Suffix
-			Case " KB" Size = Round(Size / 1024, 1)
-			Case " MB" Size = Round(Size / 1048576, 1)
-			Case " GB" Size = Round(Size / 1073741824, 1)
-			Case " TB" Size = Round(Size / 1099511627776, 1)
-		End Select
-
-		ConvertSize = Size & Suffix
-	End Function
-
+		objImageSelectionTable.InnerHTML = strTable
+	End Sub
+	
 	Sub PopulateDrives
-		Dim n
+		Dim n, arrSelectedDrives
 		n = 0
+		
+		' Check selected drives before scanning new drives
+		arrSelectedDrives = GetSelectedDrives()
 		
 		' Clear write status icon
 		SetWriteStatus(0)
@@ -190,35 +200,39 @@
 		' Reset radio buttons
 		objRadioButtonArea.InnerHTML = ""
 		
-		Dim strComputer, objWMIService, colDiskDrives, objDiskDrive, strRadioHTML, strRadioClass
+		Dim objWMIService, colDiskDrives, objDiskDrive, strRadioHTML, strRadioItemHTML, strRadioClass, strRadioChecked
+		
+		Set objWMIService = GetObject("winmgmts:{impersonationLevel=impersonate}!\\.\root\cimv2")
+		Set colDiskDrives = objWMIService.ExecQuery ("Select * from Win32_DiskDrive Where MediaType=""Removable Media""")
+		
+		strRadioHTML = ""
 
-		strComputer = "."
-		Set objWMIService = GetObject("winmgmts:" _    
-			& "{impersonationLevel=impersonate}!\\" & strComputer _
-				& "\root\cimv2")
-		Set colDiskDrives = objWMIService.ExecQuery _    
-			("Select * from Win32_DiskDrive Where MediaType=""Removable Media""")
 		For each objDiskDrive in colDiskDrives
 			n = n + 1
 			
-			strRadioHTML = objRadioButtonArea.InnerHTML
-
-			strRadioClass = "radio_disk_normal"
+			' Pre-check drives which were already selected
+			strRadioChecked = ""
+			If BEnd_InArray(objDiskDrive.DeviceID, arrSelectedDrives) Then
+				strRadioChecked = " checked"
+			End If
 			
+
+			' Render suspicious drives with "radio_disk_warning" class instead of "radio_disk_normal"
+			strRadioClass = "radio_disk_normal"
 			If objDiskDrive.Size > 17179869184 Then
 				' This is too big to a USB thumb drive (bigger than 16 Gb)
 				strRadioClass = "radio_disk_warning"
 			End If
 			
-			strRadioHTML = "<span class=" & strRadioClass & "><input type=checkbox name=formDisk_" & n & " value=" & Chr(34) & objDiskDrive.DeviceID & Chr(34) & " onclick=""CheckSelectedDrive"">" & objDiskDrive.Model & ", " & objDiskDrive.Caption & " (" & ConvertSize(objDiskDrive.Size) & ")</span><br/>"
+			strRadioItemHTML = "<span class=" & strRadioClass & "><input type=checkbox name=formDisk_" & n & " value=" & Chr(34) & objDiskDrive.DeviceID & Chr(34) & " onclick=""CheckSelectedDrive"" " & strRadioChecked & ">" & objDiskDrive.Model & ", " & objDiskDrive.Caption & " (" & BEnd_ConvertSize(objDiskDrive.Size) & ")</span><br/>"
 			
-			objRadioButtonArea.InnerHTML = objRadioButtonArea.InnerHTML & strRadioHTML
+			strRadioHTML = strRadioHTML & strRadioItemHTML
 		Next
 		
-		objRadioButtonArea.InnerHTML = objRadioButtonArea.InnerHTML & "<input type=hidden name=formDisk_length value=" & n & ">"
+		objRadioButtonArea.InnerHTML = strRadioHTML & "<input type=hidden name=formDisk_length value=" & n & ">"
 		
 		If (n = 0) Then
-			objRadioButtonArea.InnerHTML = objRadioButtonArea.InnerHTML & "<p>Varoitus: USB-muisteja ei löytynyt. Liitä yksi tai useampi USB-muisti tietokoneeseen ja napsauta alla olevaa painiketta.</p>"
+			objRadioButtonArea.InnerHTML = objRadioButtonArea.InnerHTML & "<p>Varoitus: USB-muisteja ei löytynyt. Liitä yksi tai useampi USB-muisti tietokoneeseen.</p>"
 		End If
 		
 		CheckSelectedDrive
@@ -226,22 +240,22 @@
 	End Sub
 	
 	Sub ButtonsDisable
-		buttonWriteImage.disabled = True
-		buttonWriteZeroImage.disabled = True
-		buttonPopulateDrives.disabled = True
-		buttonDownload64.disabled = True
-		buttonDownload32.disabled = True
-		buttonOpenFile.disabled = True
+		'buttonWriteImage.disabled = True
+		'buttonWriteZeroImage.disabled = True
+		'buttonPopulateDrives.disabled = True
+		'buttonDownload64.disabled = True
+		'buttonDownload32.disabled = True
+		'buttonOpenFile.disabled = True
 		' formImageName.disabled = True
 	End Sub
 	
 	Sub ButtonsEnable
-		buttonWriteImage.disabled = False
-		buttonWriteZeroImage.disabled = False
-		buttonPopulateDrives.disabled = False
-		buttonDownload64.disabled = False
-		buttonDownload32.disabled = False
-		buttonOpenFile.disabled = False	
+		'buttonWriteImage.disabled = False
+		'buttonWriteZeroImage.disabled = False
+		'buttonPopulateDrives.disabled = False
+		'buttonDownload64.disabled = False
+		'buttonDownload32.disabled = False
+		'buttonOpenFile.disabled = False	
 		' formImageName.disabled = False
 	End Sub
 	
@@ -250,6 +264,12 @@
 		
 		ReDim arrSelectedDrives(0)
 		nn=0
+		
+		If not IsObject(formDisk_length) Then
+			' The disk selection menu does not exist
+			GetSelectedDrives = arrSelectedDrives
+			Exit Function
+		End If
 		
 		intDriveLength = formDisk_length.Value
 
@@ -260,254 +280,271 @@
 				ReDim Preserve arrSelectedDrives(nn)
 				arrSelectedDrives(nn) = Eval("formDisk_" & n & ".value")
 			End If
+			SetWriteStatus(0)
 		Next
 		
 		GetSelectedDrives = arrSelectedDrives
 	End Function
 	
-	Function FileMD5IsEqual(strFilePath, strMD5)
-		Dim strMD5Cmd, exitcode, boolResult
+	' Downloads given [strImageTag]. Returns TRUE on success, FALSE on failure.
+	' If the IMAGE_SOURCE_URL_IMAGE of the given [strImageTag] is empty, does not download and returns SUCCESS
+	' If the IMAGE_SOURCE_URL_MD5 of the given [strImageTag] is empty, does not verify MD5
+	Function Download (strImageTag)
+		Dim boolResult, boolZIP, strLocalFile
 		
-		strMD5Cmd = Chr(34) & BIN_MEBMD5 & Chr(34) & " " & Chr(34) & strFilePath & Chr(34) & " " & strMD5
-		
-		Dim shell
-		Set shell = CreateObject("WScript.Shell")
-
-		AppendWriteStatus("MD5SUM: " & strMD5Cmd)
-		AppendWriteStatus("Odota, tarkistetaan ladattua levynkuvaa...")
-		
-		ButtonsDisable
-		exitcode = shell.Run(strMD5Cmd, 0, TRUE)
-		ButtonsEnable
-
-		boolResult = False
-		
-		If exitcode = 0 Then
-			' Error in MEBMD5
-			AppendWriteStatus("Varoitus! MEBMD5-komento tuotti virheen: " & strMD5Cmd)
+		' Quit if image URL is empty and return Success
+		If IMAGE_SOURCE(strImageTag)(IMAGE_SOURCE_URL_IMAGE) = "" Then
+			Download = True
+			Exit Function
 		End If
 		
-		If exitcode = 1 Then
-			' Sums match
-			boolResult = True
+		' Make sure that strImageTag exists
+		If IMAGE_SOURCE(strImageTag)(IMAGE_SOURCE_LEGEND) = "" Then
+			LogMessage "Tried to download image for tag '" & strImageTag & "' but there is no such image tag"
+			Download = False
+			Exit Function
 		End If
 		
-		FileMD5IsEqual = boolResult
-	End Function
-	
-	Function DownloadImage (strURL, strDestinationFile)
-		Dim strCurlCmd, exitcode, boolResult
+		If IMAGE_SOURCE(strImageTag)(IMAGE_SOURCE_URL_MD5) <> "" Then
+			' Download MD5 sum
+			ButtonsDisable
+			ProgressEnable("Ladataan tarkistussumma...")
+			LogMessage "Downloading MD5 sum"
+			LogMessage "MD5-summan lataus käynnistetty (" & IMAGE_SOURCE(strImageTag)(IMAGE_SOURCE_LEGEND) & ")"
+			If BEnd_DownloadMD5AndStore( _
+				IMAGE_SOURCE(strImageTag)(IMAGE_SOURCE_URL_MD5), _
+				IMAGE_SOURCE(strImageTag)(IMAGE_SOURCE_MD5_REG_PATH), _
+				IMAGE_SOURCE(strImageTag)(IMAGE_SOURCE_MD5_LOCAL_REG_KEY)) Then
+				' Success
+				LogMessage "Succeeded in downloading MD5 sum"
+			Else
+				' Fail
+				ProgressDisable
+				AppendWriteStatus("MD5-summan lataus epäonnistui, virhekoodi: " & BEnd_LastError)
+				Download = False
+				Exit Function
+			End If
+			ProgressDisable
+		End If
 		
-		strCurlCmd = Chr(34) & BIN_CURL & Chr(34) & " -L -k """ & strURL & """ -o """ & strDestinationFile & Chr(34)
+		' Are we downloading a zip?
+		If UCase(Win_GetFileExtension(IMAGE_SOURCE(strImageTag)(IMAGE_SOURCE_URL_IMAGE))) = "ZIP" Then
+			' Create a temporary filename for the zip file
+			strLocalFile = Win_GetTempFilename()
+			boolZIP = True
+			LogMessage "Created temporary file for ZIP: " & strImageTag
+		Else
+			strLocalFile = IMAGE_SOURCE(strImageTag)(IMAGE_SOURCE_LOCAL_PATH)
+			boolZIP = False
+		End If
 		
-		Dim shell
-		Set shell = CreateObject("WScript.Shell")
-		AppendWriteStatus("Levynkuvan lataus käynnistetty.")
-		AppendWriteStatus("cURL: " & strCurlCmd)
+		' Download image file
+		ProgressEnable("Ladataan levynkuva. Tämä kestää kauan...")
+		boolResult = BEnd_DownloadImage(IMAGE_SOURCE(strImageTag)(IMAGE_SOURCE_URL_IMAGE), strLocalFile)
+		ProgressDisable
 		
-		ButtonsDisable
-		exitcode = shell.Run(strCurlCmd, 1, TRUE)
-		ButtonsEnable
-		
-		If (exitcode = 0) Then
+		If boolResult Then
 			AppendWriteStatus("Levynkuvan lataus onnistui")
-			boolResult = True
-		Else
-			AppendWriteStatus("Levynkuvan lataus epäonnistui, virhekoodi #" & exitcode)
-			boolResult = False
-		End If
-		
-		DownloadImage = boolResult
-	End Function
-	
-	Function DownloadMD5 (strURL, strKeyPath, strKeyName)
-		Dim boolResult, oBrowser, strMD5
-		
-		Set oBrowser = CreateObject("MSXML2.XMLHTTP")
-		oBrowser.open "GET", strURL, False
-		oBrowser.send
-		
-		If oBrowser.Status = 200 Then
-			' Everything was OK
-			strMD5 = oBrowser.responseText
-			
-			' Store MD5 to given registry
-			boolResult = WriteRegKeyHKCU(strKeyPath, strKeyName, strMD5)
-		Else
-			boolResult = False
-		End If
-		
-		DownloadMD5 = boolResult
-	End Function
-	
-	Sub Download32
-		Dim strDestinationPath, boolResult
-		
-		' Clear write status icon
-		SetWriteStatus(0)
-		
-		strDestinationPath = GetLocalImageDirectoryPath() & "DigabiOS-32bit.iso"
-		
-		boolResult = DownloadImage(DOWNLOAD_32BIT, strDestinationPath)
-		
-		If boolResult Then
-			objCurrentImage.InnerHTML = strDestinationPath
-			CheckImagePath
-			
-			boolResult = DownloadMD5(DOWNLOAD_32BIT_MD5, REG_32BIT_MD5_PATH, REG_32BIT_MD5_KEY)
-			
-			' Verify file MD5 to downloaded MD5
-			If FileMD5IsEqual(strDestinationPath, ReadRegKeyHKCU(REG_32BIT_MD5_PATH, REG_32BIT_MD5_KEY)) Then
-				' Success
-				AppendWriteStatus("Ladattu levynkuva on virheetön.")
-			Else
-				' Fail
-				AppendWriteStatus("Varoitus! Ladatussa levynkuvassa on virheitä. Lataa tiedosto uudelleen.")
-				MsgBox "Ladatussa levynkuvassa on virheitä. Lataa tiedosto uudelleen.", 16, "Virhe"
-			End If
-		End If
-	End Sub
-	
-	Sub Download64
-		Dim strDestinationPath, boolResult
-		
-		' Clear write status icon
-		SetWriteStatus(0)
-		
-		strDestinationPath = GetLocalImageDirectoryPath() & "DigabiOS-64bit.iso"
-		
-		boolResult = DownloadImage(DOWNLOAD_64BIT, strDestinationPath)
 
-		If boolResult Then
-			objCurrentImage.InnerHTML = strDestinationPath
-			CheckImagePath
-			
-			boolResult = DownloadMD5(DOWNLOAD_64BIT_MD5, REG_64BIT_MD5_PATH, REG_64BIT_MD5_KEY)
-			
-			' Verify file MD5 to downloaded MD5
-			If FileMD5IsEqual(strDestinationPath, ReadRegKeyHKCU(REG_64BIT_MD5_PATH, REG_64BIT_MD5_KEY)) Then
-				' Success
-				AppendWriteStatus("Ladattu levynkuva on virheetön.")
+			If IMAGE_SOURCE(strImageTag)(IMAGE_SOURCE_URL_MD5) <> "" Then
+				' The settings contain URL for the MD5 so we check the file integrity
+				
+				ProgressEnable("Tarkistetaan ladattua levynkuvaa...")
+		
+				' Verify file MD5 to downloaded MD5
+				If BEnd_FileMD5IsEqual(strLocalFile, Win_ReadRegKeyHKCU(IMAGE_SOURCE(strImageTag)(IMAGE_SOURCE_MD5_REG_PATH), IMAGE_SOURCE(strImageTag)(IMAGE_SOURCE_MD5_LOCAL_REG_KEY))) Then
+					' Success
+					AppendWriteStatus("Ladattu levynkuva on virheetön.")
+					
+					If boolZIP Then
+						ProgressEnable("Puran ladatun levynkuvan...")
+
+						If not BEnd_Unbox("zip", strLocalFile, IMAGE_SOURCE(strImageTag)(IMAGE_SOURCE_LOCAL_PATH)) Then
+							ProgressDisable
+							AppendWriteStatus("Levynkuvan purkaminen epäonnistui.")
+							LogMessage("Image unboxing failed, error: " & BEnd_LastError)
+							MsgBox "Ladatun levynkuvan purkaminen epäonnistui. Lataa tiedosto uudelleen.", 16, "Virhe"
+							
+							' Delete temporary files
+							If Win_FileExists(IMAGE_SOURCE(strImageTag)(IMAGE_SOURCE_LOCAL_PATH)) and not Win_DeleteFile(IMAGE_SOURCE(strImageTag)(IMAGE_SOURCE_LOCAL_PATH)) Then
+								LogMessage("Warning: Could not remove failed image file " & IMAGE_SOURCE(strImageTag)(IMAGE_SOURCE_LOCAL_PATH))
+							End If
+							
+							If Win_FileExists(strLocalFile) and not Win_DeleteFile(strLocalFile) Then
+								LogMessage("Warning: Could not remove local temporary zip file " & strLocalFile)
+							End If
+
+							Download = False
+							Exit Function
+						End If
+						
+						If Win_FileExists(strLocalFile) and not Win_DeleteFile(strLocalFile) Then
+							LogMessage("Warning: Could not remove local temporary zip file " & strLocalFile)
+						End If
+						
+						ProgressDisable
+						AppendWriteStatus("Ladattu levynkuva on purettu")
+					End If
+					
+					ProgressDisable
+					Download = True
+				Else
+					' Fail
+					AppendWriteStatus("Levynkuvan tarkistus epäonnistui.")
+					LogMessage("Image verify failed, error: " & BEnd_LastError)
+					MsgBox "Ladatussa levynkuvassa on virheitä. Lataa tiedosto uudelleen.", 16, "Virhe"
+					' Delete failed file & hash
+					boolResult = Win_DeleteFile(IMAGE_SOURCE(strImageTag)(IMAGE_SOURCE_LOCAL_PATH))
+					boolResult = Win_WriteRegKeyHKCU(IMAGE_SOURCE(strImageTag)(IMAGE_SOURCE_MD5_REG_PATH), IMAGE_SOURCE(strImageTag)(IMAGE_SOURCE_MD5_LOCAL_REG_KEY), "")
+					
+					ProgressDisable
+					Download = False
+					Exit Function
+				End If
+
+				ProgressDisable
 			Else
-				' Fail
-				AppendWriteStatus("Varoitus! Ladatussa levynkuvassa on virheitä. Lataa tiedosto uudelleen.")
-				MsgBox "Ladatussa levynkuvassa on virheitä. Lataa tiedosto uudelleen.", 16, "Virhe"
+				' There was no URL for the MD5 so we expect that the file is ok
+				Download = True
+			End If
+		Else
+			ProgressDisable
+			LogMessage("Image download failed, error: " & BEnd_LastError)
+			AppendWriteStatus("Levynkuvan lataus epäonnistui.")
+			MsgBox "Levynkuvan lataus epäonnistui.", 16, "Virhe"
+
+			' Delete failed file & hash
+			boolResult = Win_DeleteFile(IMAGE_SOURCE(strImageTag)(IMAGE_SOURCE_LOCAL_PATH))
+			boolResult = Win_WriteRegKeyHKCU(IMAGE_SOURCE(strImageTag)(IMAGE_SOURCE_MD5_REG_PATH), IMAGE_SOURCE(strImageTag)(IMAGE_SOURCE_MD5_LOCAL_REG_KEY), "")
+
+			Download = False
+			Exit Function
+		End If
+		
+		ProgressDisable
+		
+		' Now we have successfully downloaded image
+		' Refresh the UI
+		PopulateImages
+	End Function
+	
+    Sub AskImageFilePath
+		Dim strPath
+		
+		' Clear write status icon
+		SetWriteStatus(0)
+	
+		strPath = Win_DialogImageFile("Valitse tiedosto", Win_GetLocalImageDirectoryPath(), "*.iso;*.dd")
+		
+		If strPath <> "" Then
+			' Set file path IMAGE_SOURCE properties
+			If Win_FileExists(strPath) Then
+				' Good, the file even exists
+				IMAGE_SOURCE("local_image")(IMAGE_SOURCE_LOCAL_PATH) = strPath
 			End If
 		End If
 	End Sub
 	
-    Sub SetCurrentImage
-		objCurrentImage.InnerHTML = formImageName.value
-		CheckImagePath
-    End Sub
+	' Sets currently selected image as [strImageTag]
+	Sub SelectImage (strImageTag)
+		Dim objRow, strThisTag
+		
+		strCurrentImageTag = strImageTag
+		
+		' Update UI (objImageTable)
+		For Each strThisTag in IMAGE_SOURCE
+			Set objRow = document.getElementById("objImageTableRow_" & strThisTag)
+			If strThisTag = strImageTag Then
+				' This is the selected row
+				objRow.className = "imageTableSelected"
+			Else
+				' This is normal row
+				objRow.className = "imageTableNormal"
+			End If
+		Next
+	End Sub
 	
-	Sub openImageFile
-		Dim s, i2
-		
-		' Clear write status icon
-		SetWriteStatus(0)
-		
-		s = Dlg.openfiledlg(CStr(GetLocalImageDirectoryPath() & "*.iso;*.dd"), , , CStr("Valitse tiedosto"))  
-		If (Len(s) > 0) Then
-			' A file was selected
-			
-			'--strange HTMLDlgHelper behavior. Returns a string ending with nulls.
-			'-- The nulls won't affect using the string, but they will matter if you test the string.
-			'-- For instance: If UCase(Right(s, 3)) = "TXT" Then ....   That won't work unless the nulls are snipped.    
-			'-- so check for nulls. If first null is first character that will return "". Otherwise there's a path string to
-			'--  extract from the string buffer.
-			i2 = InStr(s, Chr(0))
-			If i2 > 1 Then  s = Left(s, (i2 - 1))
-			' Set file path to hidden field on the form
-			formImageName.value = s
-			SetCurrentImage
+	' Checks that current image tag (strCurrentImageTag) points to an existing file name
+	Sub CheckImagePath
+		If (Win_FileExists(IMAGE_SOURCE(strCurrentImageTag)(IMAGE_SOURCE_LOCAL_PATH))) Then
+			objStep1Logo.InnerHTML = "<img src=""marssiva_kukko_harmaa.png"">"
+		Else
+			objStep1Logo.InnerHTML = "<img src=""marssiva_kukko_vihrea.png"">"
 		End If
 	End Sub
 	
-	Sub WriteImage (strFunction)
-		Dim strImageFile, arrSelectedDrives, strWorkerCmd, objButton, returnCode, n, exitcode
+	' Writes strCurrentImageTag image to the selected drives
+	Sub WriteImage
+		Dim boolWriteSuccess, strImageFile, arrSelectedDrives, boolVerifyImage, intReturnCode
 		
-		' Set image file
-		strImageFile = objCurrentImage.InnerHTML
-		If strFunction = "zero" Then
-			strImageFile = ReadMEBDDInstallationPath() & "\zero_image.iso"
-		End If
-		
-		' Check if file exists
-		Dim fso
-		Set fso = CreateObject("Scripting.FileSystemObject")
-		If (Not fso.FileExists(strImageFile)) Then
-			MsgBox "Tiedostoa " & strImageFile & " ei löydy", 16, "Virhe"
+		' Silently exit if strCurrentImageTag has not been set
+		If strCurrentImageTag = "" Then
+			LogMessage "Cowardly refusing to write the image as current image tag is not set"
 			Exit Sub
 		End If
 		
+		' Get image path
+		strImageFile = IMAGE_SOURCE(strCurrentImageTag)(IMAGE_SOURCE_LOCAL_PATH)
+		
+		' Get selected drives
 		arrSelectedDrives = GetSelectedDrives()
 		
 		If (UBound(arrSelectedDrives) = 0) Then
 			MsgBox "Valitse USB-muisti", 16, "Virhe"
 			Exit Sub
 		End If
+
+		intReturnCode = MsgBox("Varoitus! Tämä toimenpide poistaa kaikki tiedostot valitsemiltasi USB-muisteilta. Oletko varma, että haluat jatkaa?", 1+32+256, "Vahvista")
 		
-		returnCode = MsgBox("Varoitus! Tämä toimenpide ylikirjoittaa valitsemasi USB-muistit. Oletko varma, että haluat jatkaa?", 1+32+256, "Vahvista")
-		
-		If returnCode <> 1 Then
+		If intReturnCode <> 1 Then
 			MsgBox "Toimenpide peruutettiin", 64, "Peruutus"
 			Exit Sub
 		End If
 		
-		If not strFunction = "zero" Then
-			WriteLastImagePath(strImageFile)
-		End If
-		
 		If checkboxVerify.checked Then
 			' Execute mebdd_worker with verify
-			strWorkerCmd = Chr(34) & BIN_MEBDD_WORKER & Chr(34) & " -v " & Chr(34) & strImageFile & Chr(34)
+			boolVerifyImage = True
 		Else
 			' No verify this time
-			strWorkerCmd = Chr(34) & BIN_MEBDD_WORKER & Chr(34) & " " & Chr(34) & strImageFile & Chr(34)
+			boolVerifyImage = False
 		End If
 		
-		AppendWriteStatus(strWorkerCmd)
-
-		For n = 1 to UBound(arrSelectedDrives)
-			strWorkerCmd = strWorkerCmd & " " & Chr(34) & arrSelectedDrives(n) & Chr(34)
-		Next
-		
-		Dim shell
-		Set shell = CreateObject("WScript.Shell")
-		If strFunction = "zero" Then
+		If strCurrentImageTag = "local_zero" Then
 			AppendWriteStatus("Levynkuvan kirjoitus (USB-muistin tyhjennys) on käynnistetty.")
+			ProgressEnable("Tyhjennän USB-muistin/muisteja...")
 		Else
-			AppendWriteStatus("Levynkuvan kirjoitus on käynnistetty.")
+			' Store last image path
+			If not Win_WriteLastImageTag(strCurrentImageTag) Then
+				LogMessage("Could not store last selected image: " & Win_LastError)
+			End If
+			ProgressEnable("Kirjoitan USB-muistin/muistit...")
 		End If
-		AppendWriteStatus("mebdd_worker: " & strWorkerCmd)
 
-		ButtonsDisable
-		exitcode = shell.Run(strWorkerCmd, 1, TRUE)
-		ButtonsEnable
-
-		If (exitcode = 255) Then
+		boolWriteSuccess = BEnd_WriteImage(strImageFile, arrSelectedDrives, boolVerifyImage)
+		
+		ProgressDisable
+		
+		If boolWriteSuccess Then
+			' Write succeeded
 			SetWriteStatus(1)
-			If strFunction = "zero" Then
+			If strCurrentImageTag = "local_zero" Then
 				AppendWriteStatus("Levynkuvan kirjoitus (USB-muistin tyhjennys) onnistui")
 				MsgBox "USB-muisti on tyhjennetty. Irrota ja liitä muisti takaisin. Hyväksy ehdotus alustuksesta (formatoinnista).", 64
 			Else
 				AppendWriteStatus("Levynkuvan kirjoitus onnistui")
 			End If
 		Else
+			' Write Failed
 			SetWriteStatus(-1)
-			AppendWriteStatus("Levynkuvan kirjoitus epäonnistui, virhekoodi #" & exitcode & _
-				" <a href='file://" & GetEnvironmentString("TEMP") & "\mebdd_worker.txt'>Avaa lokitiedosto</a>")
-		End If
-	End Sub
-	
-	Sub CheckImagePath
-		Dim fso
-		Set fso = CreateObject("Scripting.FileSystemObject")
-		If (Not fso.FileExists(objCurrentImage.InnerHTML)) Then
-			objStep1Logo.InnerHTML = "<img src=""marssiva_kukko_harmaa.png"">"
-		Else
-			objStep1Logo.InnerHTML = "<img src=""marssiva_kukko_vihrea.png"">"
+
+			If BEnd_LastError = "IMAGE_FILE_NOT_FOUND" Then
+				MsgBox "Tiedostoa " & strImageFile & " ei löydy", 16, "Virhe"
+			ElseIf BEnd_LastError = "NO_DRIVES_SELECTED" Then
+				MsgBox "Valitse USB-muisti", 16, "Virhe"
+			Else
+				AppendWriteStatus("Levynkuvan kirjoitus epäonnistui, virhekoodi " & BEnd_LastError & _
+				" <a href='file://" & Win_GetEnvironmentString("TEMP") & "\mebdd_worker.txt'>Avaa lokitiedosto</a>")
+			End If
 		End If
 	End Sub
 	
@@ -544,52 +581,91 @@
 	Function AppendWriteStatus (strNewMessage)
 		objWriteStatus.InnerHTML = Time & " : " & strNewMessage & "<br/>" & objWriteStatus.InnerHTML
 		
+		' Append to log as well
+		LogMessage strNewMessage
+		
 		' Return always TRUE (Why this is not a sub?)
 		AppendWriteStatus = True
 	End Function
 	
+	' Make progress layer visible with text [strMessage]
+	Sub ProgressEnable (strMessage) 
+		document.getElementById("objProgressLayerText").InnerHTML = strMessage
+		document.getElementById("objProgressLayer").style.visibility = "visible"
+		AppendWriteStatus(strMessage)
+		ButtonsDisable
+	End Sub
+	
+	' Make progress layer invisible
+	Sub ProgressDisable
+		document.getElementById("objProgressLayer").style.visibility = "hidden"
+		ButtonsEnable
+	End Sub
+	
+	Sub Window_onLoad_Delayed
+		window.clearInterval(objTimerOnload)
+		
+		' Enable progress layer
+		ProgressEnable("Tarkistan uusimpia versioita palvelimelta...")
+		
+		' Refresh remote versions
+		GetRemoteVersions
+		
+		' Create image selections
+		PopulateImages
+		
+		' Select stored image tag
+		SelectImage(strCurrentImageTag)
+		
+		' Hide progress layer
+		ProgressDisable
+		
+		' Set timer to rescan disks every now and then
+		objTimerScandisks = window.setInterval("PopulateDrives", 5000)
+		
+	End Sub
+	
 	Sub Window_onLoad
-		' Set previous image path
-		Dim strLastImagePath
-		strLastImagePath = ReadLastImagePath()
-		objCurrentImage.InnerHTML = strLastImagePath
-		CheckImagePath
+		Dim strLastImageTag
+		
+		' Execute time-consuming init things after the screen has been drawn
+		objTimerOnload = window.setInterval("Window_onLoad_Delayed", 1000)
 		
 		' Set drive options
 		PopulateDrives
 		
+		' Get last stored image tag and set is as current image
+		strLastImageTag = Win_ReadLastImageTag()
+		
+		If strLastImageTag <> "" Then
+			If IMAGE_SOURCE(strLastImageTag)(IMAGE_SOURCE_LEGEND) <> "" Then
+				strCurrentImageTag = Win_ReadLastImageTag()
+			End If
+		End If
+		
 		' Set write status to neutral
 		SetWriteStatus(0)
 	End Sub
-	
+
 </script>
 
 <body>
 <table>
-<tr><td colspan="2"><h1>Vaihe 1: Lataa tai valitse tarvittava tiedosto</h1></td></tr>
+<tr><td colspan="2"><h1>Vaihe 1: Millaisen USB-muistin haluat?</h1></td></tr>
 <tr>
 	<td id="objStep1Logo" class="cellIcon"></td>
 	<td class="cellText">
-	<p>Tarvittavan tiedoston tiedostopääte on .iso. Voit ladata tiedoston selaimella tai käyttämällä alla olevia painikkeita. Vaihtoehtoisesti voit käyttää jo lataamaasi tiedostoa.</p>
-	<p>Valittu tiedosto: <span class="file_path"><span id="objCurrentImage"></span></span></p>
-	<p>Hae uusi tiedosto:
-	<ul>
-	<li>Koneellasi ei ole tiedostoa: <input type="button" id="buttonDownload64" value="Lataa 64-bittinen versio" onclick="Download64()"></li>
-	<li>Koneellasi ei ole tiedostoa: <input type="button" id="buttonDownload32" value="Lataa 32-bittinen versio" onclick="Download32()"> - kokeile tätä, jos kone ei käynnisty 64-bittisellä versiolla</li>
-	<li>Koneellasi on jo tiedosto: <input type="hidden" id="formImageName" value=""><input type="button" id="buttonOpenFile" value="Avaa .iso-tiedosto" onClick="openImageFile()"></li>
-	</ul>
+		<span id="objImageSelectionTable"></span>
 	</td>
 </tr>
 
-<tr><td colspan="2"><h1>Vaihe 2: Valitse käytettävä USB-muisti</h1></td></tr>
+<tr><td colspan="2"><h1>Vaihe 2: Valitse USB-muistit</h1></td></tr>
 <tr>
 	<td id="objStep2Logo" class="cellIcon"></td>
 	<td class="cellText">
-	<p>Valitse yksi tai useampi USB-muisti, johon haluat kirjoittaa DigabiOS:n. Jos et ole vielä syöttänyt USB-muistia koneeseen, tee se nyt ja napsauta Etsi USB-muistit -painiketta.</p>
+	<p>Liitä USB-muistit tietokoneeseen ja valitse kirjoitettavat USB-muistit alla olevasta listasta:</p>
 	<span class="radio_disk_normal">
-	<span id="objRadioButtonArea"></span>
-	<br/><input type="button" id="buttonPopulateDrives" value="Etsi USB-muistit" onclick="PopulateDrives">
-	<input type="button" id="buttonWriteZeroImage" value="Palauta muistit alkuperäiseen kokoonsa" onclick="WriteImage('zero')">
+	<span id="objRadioButtonArea"><input type="hidden" name="formDisk_length" value="0"></span>
 	</td>
 </tr>
 
@@ -598,13 +674,19 @@
 	<td id="objStep3Logo" class="cellIcon"></td>
 	<td class="cellText">
 	<p><input type="checkbox" id="checkboxVerify" name="checkboxVerify" checked>Tarkista kirjoitettu USB-muisti kirjoitusvirheiden varalta</p>
-	<p>Kun olet valinnut kopioitavan levynkuvan ja käytettävän USB-muistin, napsauta allaolevasta painikkeesta.</p>
-	<input type="button" id="buttonWriteImage" value="Käynnistä USB-muistin kirjoitus" onclick="WriteImage('normal')">
+	<p>Kun olet valinnut kopioitavan tiedoston ja käytettävän USB-muistin, napsauta allaolevasta painikkeesta.</p>
+	<input type="button" id="buttonWriteImage" value="Käynnistä USB-muistin kirjoitus" onclick="WriteImage()">
 	<br/><br/>
 	<span id="objWriteStatus"></span>
 	</td>
 </tr>
 </table>
+
+<div id="objProgressLayer" class="progressLayer" style="visibility: hidden">
+	<img style="margin: 10px" src="working.gif"/><br/>
+	<span id="objProgressLayerText"></span>
+</div>
+
 <!-- This is needed for file open dialog -->
 <OBJECT ID=Dlg CLASSID="CLSID:3050F4E1-98B5-11CF-BB82-00AA00BDCE0B" width=0 height=0> </OBJECT>
 </body>

@@ -6,7 +6,7 @@ Ohjelmalla voi kopioida minkä tahansa iso-tiedoston USB-tikulle, mutta
 se on optimoitu erityisesti DigabiOS:n asennukseen. Käyttöliittymässä on
 painikkeet DigabiOS:n uusimpien versioiden lataukseen.
 
-Itse ohjelmakoodi (meb_dd.hta) on lisensoitu GPL:lla. Tarkka lisenssiteksti
+Itse ohjelmakoodi (mebdd.hta) on lisensoitu GPL:lla. Tarkka lisenssiteksti
 löytyy ohjelmatiedoston alusta ja tiedostosta (meb_dd_copying.txt).
 
 Asennuspaketista löytyy myös kolme ohjelmaa, joilla on omat lisenssinsä.
@@ -27,8 +27,45 @@ OpenSSL
 - Windows-asennuspaketti: https://www.openssl.org/related/binaries.html
 - Lisenssi: openssl_license.txt
 
+Info-Zip UnZip
+- Ladatun zip-paketin purkaminen
+- Kotisivu verkossa: http://www.info-zip.org/
+- Windows-asennupaketti: ftp://ftp.info-zip.org/pub/infozip/win32/unz552xn.exe
+- Lisenssi: unzip_license.txt
+
+mebdd_read käyttää MD5-kirjastoa md5customised:
+  Copyright (c) 1999-2006 by the Free Pascal development team
+  
 Muutokset
 ---------
+
+1.3a (9.11.2014)
+- käyttöliittymän ulkopuolinen koodi eriytetty omiin tiedostoihinsa
+- imaget määritellään hash-muuttujaan
+- mebdd havaitsee päivittyneet imaget
+- imaget voivat olla myös zip-pakattuja
+- ladatun imagen eheys tarkistetaan palvelimella olevalla MD5-summalla
+- mebdd kirjoittaa lokitiedostoa
+- käyttöliittymämuutoksia, mutta käyttöliittymä on vielä kesken
+
+1.2 (7.11.2014)
+- versio 1.2f allekirjoitettuna jakeluun
+
+1.2f (30.10.2014)
+- mebdd_read laskee MD5-summan lukiessaan datan USB-muistilta, ei tarvita
+  kopiointia kovalevylle
+  
+1.2e (29.10.2014)
+- mebdd_read yrittää avata levyn toisella kutsulla, yritetään korjata
+  Windows 7:ssa (32bit) havaittu ongelma
+
+1.2d (23.10.2014)
+- levynkuvan valinnassa tiedoston pääte voi olla *.iso:n lisäksi *.dd
+- mebdd_worker, mebmd5 ja mebdd_read osaavat kertoa käännösajankohdan
+
+1.2c (23.10.2014)
+- mebdd_worker lukee USB-muistin sisällön mebdd_read:llä (tällä pyritään
+  välttämään muistin loppuminen kopioinnin yhteydessä)
 
 1.2b (20.10.2014)
 - mebdd_worker käyttää MD5-summan laskemisess mebmd5:ttä
