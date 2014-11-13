@@ -417,7 +417,7 @@ var
 	
 begin
 	// Init log file
-	proc_log_filename(IncludeTrailingPathDelimiter(GetEnvironmentVariable('TEMP'))+'mebdd_worker.txt');
+	proc_log_filename(IncludeTrailingPathDelimiter(GetEnvironmentVariable('TEMP'))+'mebdd.txt');
 	proc_log_string('Execution started - mebdd_worker build ' + {$I %DATE%} + ' ' + {$I %TIME%});
 	
 	// Check if user is admin

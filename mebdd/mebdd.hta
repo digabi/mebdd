@@ -538,7 +538,7 @@
 				MsgBox "Valitse USB-muisti", 16, "Virhe"
 			Else
 				AppendWriteStatus("Levynkuvan kirjoitus epäonnistui, virhekoodi " & BEnd_LastError & _
-				" <a href='file://" & Win_GetEnvironmentString("TEMP") & "\mebdd_worker.txt'>Avaa lokitiedosto</a>")
+				" <a href='file://" & Win_GetEnvironmentString("TEMP") & "\mebdd.txt'>Avaa lokitiedosto</a>")
 			End If
 		End If
 	End Sub
@@ -620,6 +620,7 @@
 		
 	End Sub
 	
+	' Magically named Window_onLoad is executed when HTA page is loaded
 	Sub Window_onLoad
 		Dim strLastImageTag
 		
@@ -642,9 +643,19 @@
 		SetWriteStatus(0)
 	End Sub
 
+	' This is executed whenever user exits the script.
+	Sub Window_OnExit
+		' Clear timer intervals
+		window.clearInterval(objTimerOnload)
+		window.clearInterval(objTimerScandisks)
+		' Log exit
+		LogMessage "Exiting by user"
+		
+	End Sub
+	
 </script>
 
-<body>
+<body onBeforeUnload="Window_OnExit">
 <table>
 <tr><td colspan="2"><h1>Vaihe 1: Millaisen USB-muistin haluat?</h1></td></tr>
 <tr>
