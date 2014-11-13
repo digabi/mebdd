@@ -18,7 +18,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 	
 -->
-<title>MEB DD 1.3a</title>
+<title>MEB DD 1.3c</title>
 <HTA:APPLICATION 
      APPLICATIONNAME="MEB DD"
      SCROLL="yes"
@@ -79,19 +79,13 @@
 	
 	Dim IMAGE_SOURCE
 	Set IMAGE_SOURCE = CreateObject("Scripting.Dictionary")
-	' Koulutusverkossa olevat KTP & KOE
-	IMAGE_SOURCE.Add "digabiktp", Array("Digabi KTP", "Digabin koetilan palvelin (KTP), Digabi-kouluttajakurssi", "http://192.168.0.1/latest/ktp.zip", "http://192.168.0.1/latest/ktp.zip.md5", Win_GetLocalImageDirectoryPath() & "ktp.dd", REG_HKCU_PATH, "MD5_digabiktp_remote", "MD5_digabiktp_local")
-	IMAGE_SOURCE.Add "digabikoe", Array("Digabi KOE", "Digabin kokelaan päätelaite (KOE), Digabi-kouluttajakurssi", "http://192.168.0.1/latest/koe.zip", "http://192.168.0.1/latest/koe.zip.md5", Win_GetLocalImageDirectoryPath() & "koe.dd", REG_HKCU_PATH, "MD5_digabikoe_remote", "MD5_digabikoe_local")
-	' Koulutusverkossa olevat DigabiOS 64bit ja 32bit
-	IMAGE_SOURCE.Add "digabi64", Array("DigabiOS 64bit", "DigabiOS-demokäyttöjärjestelmä, 64 bittinen", "http://192.168.0.1/dos/digabios-64bit.iso", "http://192.168.0.1/dos/digabios-64bit.iso.md5", Win_GetLocalImageDirectoryPath() & "DigabiOS-64bit.iso", REG_HKCU_PATH, "MD5_digabi64_remote", "MD5_digabi64_local")
-	IMAGE_SOURCE.Add "digabi32", Array("DigabiOS 32bit", "DigabiOS-demokäyttöjärjestelmä, 32 bittinen", "http://192.168.0.1/dos/digabios-32bit.iso", "http://192.168.0.1/dos/digabios-32bit.iso.md5", Win_GetLocalImageDirectoryPath() & "DigabiOS-32bit.iso", REG_HKCU_PATH, "MD5_digabi32_remote", "MD5_digabi32_local")
 	' KTP & KOE
-	'IMAGE_SOURCE.Add "digabiktp", Array("Digabi KTP", "Digabin koetilan palvelin (KTP)", "http://kurko.digabi.fi/latest/ktp.zip", "http://kurko.digabi.fi/latest/ktp.zip.md5", Win_GetLocalImageDirectoryPath() & "Digabi-KTP.dd", REG_HKCU_PATH, "MD5_digabiktp_remote", "MD5_digabiktp_local")
-	'IMAGE_SOURCE.Add "digabikoe", Array("Digabi KOE", "Digabin kokelaan päätelaite (KOE)", "http://kurko.digabi.fi/latest/koe.zip", "http://kurko.digabi.fi/latest/koe.zip.md5", Win_GetLocalImageDirectoryPath() & "Digabi-KOE.dd", REG_HKCU_PATH, "MD5_digabikoe_remote", "MD5_digabikoe_local")
+	IMAGE_SOURCE.Add "digabiktp", Array("Digabi KTP", "Digabin koetilan palvelin (KTP)", "http://kurko.digabi.fi/latest/ktp.zip", "http://kurko.digabi.fi/latest/ktp.zip.md5", Win_GetLocalImageDirectoryPath() & "ktp.dd", REG_HKCU_PATH, "MD5_digabiktp_remote", "MD5_digabiktp_local")
+	IMAGE_SOURCE.Add "digabikoe", Array("Digabi KOE", "Digabin kokelaan päätelaite (KOE)", "http://kurko.digabi.fi/latest/koe.zip", "http://kurko.digabi.fi/latest/koe.zip.md5", Win_GetLocalImageDirectoryPath() & "koe.dd", REG_HKCU_PATH, "MD5_digabikoe_remote", "MD5_digabikoe_local")
 	' DigabiOS demo
-	'IMAGE_SOURCE.Add "digabi64", Array("DigabiOS 64bit", "DigabiOS-demokäyttöjärjestelmä, 64 bittinen", "https://digabi.fi/64bit", "https://digabi.fi/64bit/md5", Win_GetLocalImageDirectoryPath() & "DigabiOS-64bit.dd", REG_HKCU_PATH, "MD5_digabi64_remote", "MD5_digabi64_local")
-	'IMAGE_SOURCE.Add "digabi32", Array("DigabiOS 32bit", "DigabiOS-demokäyttöjärjestelmä, 32 bittinen", "https://digabi.fi/32bit", "https://digabi.fi/32bit/md5", Win_GetLocalImageDirectoryPath() & "DigabiOS-32bit.dd", REG_HKCU_PATH, "MD5_digabi32_remote", "MD5_digabi32_local")
-	' Lokaalit testit
+	IMAGE_SOURCE.Add "digabi64", Array("DigabiOS 64bit", "DigabiOS-demokäyttöjärjestelmä, 64 bittinen", "https://digabi.fi/64bit", "https://digabi.fi/64bit/md5", Win_GetLocalImageDirectoryPath() & "DigabiOS-64bit.dd", REG_HKCU_PATH, "MD5_digabi64_remote", "MD5_digabi64_local")
+	IMAGE_SOURCE.Add "digabi32", Array("DigabiOS 32bit", "DigabiOS-demokäyttöjärjestelmä, 32 bittinen", "https://digabi.fi/32bit", "https://digabi.fi/32bit/md5", Win_GetLocalImageDirectoryPath() & "DigabiOS-32bit.dd", REG_HKCU_PATH, "MD5_digabi32_remote", "MD5_digabi32_local")
+	' Local tests
 	'IMAGE_SOURCE.Add "digabiktplocal", Array("Digabi KTP", "Digabin koetilan palvelin (KTP), paikallinen", "http://127.0.0.1:8080/ktp.zip", "http://127.0.0.1:8080/ktp.zip.md5", Win_GetLocalImageDirectoryPath() & "ktp.dd", REG_HKCU_PATH, "MD5_digabiktp_remote_localhost", "MD5_digabiktp_local_localhost")
 	'IMAGE_SOURCE.Add "digabikoelocal", Array("Digabi KOE", "Digabin kokelaan päätelaite (KOE), paikallinen", "http://127.0.0.1:8080/koe.zip", "http://127.0.0.1:8080/koe.zip.md5", Win_GetLocalImageDirectoryPath() & "koe.dd", REG_HKCU_PATH, "MD5_digabikoe_remote_localhost", "MD5_digabikoe_local_localhost")
 	' Do not change these
@@ -203,7 +197,8 @@
 		Dim objWMIService, colDiskDrives, objDiskDrive, strRadioHTML, strRadioItemHTML, strRadioClass, strRadioChecked
 		
 		Set objWMIService = GetObject("winmgmts:{impersonationLevel=impersonate}!\\.\root\cimv2")
-		Set colDiskDrives = objWMIService.ExecQuery ("Select * from Win32_DiskDrive Where MediaType=""Removable Media""")
+		'Set colDiskDrives = objWMIService.ExecQuery ("Select * from Win32_DiskDrive Where MediaType=""Removable Media""")
+		Set colDiskDrives = objWMIService.ExecQuery ("Select * from Win32_DiskDrive Where MediaType Like ""Removable Media%""")
 		
 		strRadioHTML = ""
 

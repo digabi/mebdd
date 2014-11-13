@@ -39,6 +39,15 @@ mebdd_read käyttää MD5-kirjastoa md5customised:
 Muutokset
 ---------
 
+1.3c (12.11.2014)
+- muutettu näytettävien usb-muistien tyyppiä saatujen raporttien perusteella
+- päivitystiedostoina käytetään julkisia URLeja testiverkon sijaan
+
+1.3b (10.11.2014)
+- korjattu virhe rekisterin kirjoituksessa
+- lisätty skirpti mebdd_list_drives.hta, jolla voi listata kaikki työasemaan
+  liitetyt levyasemat
+
 1.3a (9.11.2014)
 - käyttöliittymän ulkopuolinen koodi eriytetty omiin tiedostoihinsa
 - imaget määritellään hash-muuttujaan

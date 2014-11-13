@@ -73,10 +73,16 @@ Function Win_WriteRegKeyHKCU (strRegPath, strRegKey, strValue)
 	End If
 	
 	Set oReg=GetObject("winmgmts:{impersonationLevel=impersonate}!\\.\root\default:StdRegProv")
+	
+	' If the key exists check the access, otherwise just write
+	If oReg.EnumKey(HKEY_CURRENT_USER, strRegPath, "", "") <> 0 Then
+		' Key does not exist, create it
+		oReg.CreateKey HKEY_CURRENT_USER, strRegPath
+	End If
+	
 	oReg.CheckAccess HKEY_CURRENT_USER, strRegPath, KEY_SET_VALUE, bHasAccessRight
 
 	If bHasAccessRight Then
-		oReg.CreateKey HKEY_CURRENT_USER, strRegPath
 		oReg.SetStringValue HKEY_CURRENT_USER, strRegPath, strRegKey, strValue
 		Win_WriteRegKeyHKCU = True
 	Else
