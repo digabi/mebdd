@@ -1,0 +1,228 @@
+#mebdd.hta:88
+msgid "Digabi exam server"
+msgstr "Digabi koetilan palvelin"
+
+#mebdd.hta:89
+msgid "Digabi exam server (KTP)"
+msgstr "Digabi koetilan palvelin (KTP)"
+
+#mebdd.hta:93
+msgid "Digabi exam device"
+msgstr "Digabi koetilan p‰‰telaite"
+
+#mebdd.hta:94
+msgid "Digabi exam device (KOE)"
+msgstr "Digabi koetilan p‰‰telaite (KOE)"
+
+#mebdd.hta:99
+msgid "DigabiOS 64bit"
+msgstr ""
+
+#mebdd.hta:100
+msgid "DigabiOS demo operating system, 64 bit"
+msgstr ""
+
+#mebdd.hta:104
+msgid "DigabiOS 32bit"
+msgstr ""
+
+#mebdd.hta:105
+msgid "DigabiOS demo operating system, 32 bit"
+msgstr ""
+
+#mebdd.hta:114
+msgid "Reset"
+msgstr ""
+
+#mebdd.hta:115
+msgid "Select this to reset USB memories"
+msgstr ""
+
+#mebdd.hta:119
+msgid "Local file (.iso, .dd)"
+msgstr ""
+
+#mebdd.hta:120
+msgid "Select file"
+msgstr ""
+
+#mebdd.hta:194
+msgid "Download"
+msgstr ""
+
+#mebdd.hta:201
+msgid "Update"
+msgstr ""
+
+#mebdd.hta:208
+msgid "Select"
+msgstr ""
+
+#mebdd.hta:267
+msgid "No USB memories found. Please insert one or more USB memories to your computer."
+msgstr ""
+
+#mebdd.hta:269
+msgid "Select USB memories to rewrite:"
+msgstr ""
+
+#mebdd.hta:309
+msgid "Phase 1: Select image to write"
+msgstr "Vaihe 1: Valitse kirjoitettava levynkuva"
+
+#mebdd.hta:310
+msgid "Phase 2: Select USB memories"
+msgstr ""
+
+#mebdd.hta:311
+msgid "Phase 3: Write USB memories"
+msgstr ""
+
+#mebdd.hta:312
+msgid "Verify written USB memories for errors"
+msgstr ""
+
+#mebdd.hta:313
+msgid "Write USB memories"
+msgstr ""
+
+#mebdd.hta:378
+msgid "Downloading checksum from the server..."
+msgstr ""
+
+#mebdd.hta:389
+msgid "Failed to download checksum from the server. Error code: %x"
+msgstr ""
+
+#mebdd.hta:408
+msgid "Downloading image data from the server. This takes a long time......"
+msgstr ""
+
+#mebdd.hta:413
+msgid "Image data downloaded successfully"
+msgstr ""
+
+#mebdd.hta:418
+msgid "Checking downloaded image data..."
+msgstr ""
+
+#mebdd.hta:423
+msgid "There are no errors in the image data."
+msgstr ""
+
+#mebdd.hta:426
+msgid "Unpacking the image data..."
+msgstr ""
+
+#mebdd.hta:430
+msgid "Failed to unpack the image data."
+msgstr ""
+
+#mebdd.hta:432
+msgid "Failed to unpack the image data. Please download the image data again"
+msgstr ""
+
+#mebdd.hta:432
+msgid "Error"
+msgstr ""
+
+#mebdd.hta:452
+msgid "The downloaded image data has been unpacked."
+msgstr ""
+
+#mebdd.hta:459
+msgid "There are errors in the downloaded image data."
+msgstr ""
+
+#mebdd.hta:461
+msgid "There are errors in the downloaded image data. Please download the image data again."
+msgstr ""
+
+#mebdd.hta:461
+msgid "Error"
+msgstr ""
+
+#mebdd.hta:479
+msgid "The image data download failed."
+msgstr ""
+
+#mebdd.hta:480
+msgid "The image data download failed."
+msgstr ""
+
+#mebdd.hta:480
+msgid "Error"
+msgstr ""
+
+#mebdd.hta:503
+msgid "Select file"
+msgstr ""
+
+#mebdd.hta:559
+msgid "Please select at least one USB memory"
+msgstr ""
+
+#mebdd.hta:559
+msgid "Error"
+msgstr ""
+
+#mebdd.hta:563
+msgid "Warning! This operation removes all files from the selected USB memories. Are you sure you want to continue?"
+msgstr ""
+
+#mebdd.hta:563
+msgid "Confirm"
+msgstr ""
+
+#mebdd.hta:566
+msgid "Operation cancelled"
+msgstr ""
+
+#mebdd.hta:566
+msgid "Cancelled"
+msgstr ""
+
+#mebdd.hta:579
+msgid "Now resetting USB memories..."
+msgstr ""
+
+#mebdd.hta:585
+msgid "Writing USB memories..."
+msgstr ""
+
+#mebdd.hta:596
+msgid "Resetting USB memories has finished successfully."
+msgstr ""
+
+#mebdd.hta:597
+msgid "The USB memories have been reset. Please remove the USB memories and insert them again. Accept the suggestion of formatting the inserted memories."
+msgstr ""
+
+#mebdd.hta:599
+msgid "The USB memories have been written successfully"
+msgstr ""
+
+#mebdd.hta:606
+msgid "File %x was not found"
+msgstr ""
+
+#mebdd.hta:606
+msgid "Error"
+msgstr ""
+
+#mebdd.hta:608
+msgid "Please select at least one USB memory"
+msgstr ""
+
+#mebdd.hta:608
+msgid "Error"
+msgstr ""
+
+#mebdd.hta:610
+msgid "USB memory write failed. Error code: %x <a href='%x'>Open Log File</a>"
+msgstr ""
+
+#mebdd.hta:673
+msgid "Checking latest versions from the server..."
+msgstr ""
+

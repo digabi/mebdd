@@ -18,7 +18,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 	
 -->
-<title>MEB DD 1.3c</title>
+<title>MEB DD 1.3d</title>
 <HTA:APPLICATION 
      APPLICATIONNAME="MEB DD"
      SCROLL="yes"
@@ -41,11 +41,13 @@
 		.imageTableSelected { font-family: Arial; font-size: 12pt; background-color: grey; }
 		
 		.progressLayer { position: absolute; width: 200px; height: 200px; z-index: 2; left: 200px; top: 200px; margin-left: auto; margin-right: auto; background-color: #ffffff; border-style: solid; border-color: black; font-family: Arial; padding: 20px; }
+		.languageSelectionLayer { float: right; font-family: Arial; color: red; }
 	</style>
 </head>
 
 <script language="VBScript" src="mebdd_windows.vbs"></script>
 <script language="VBScript" src="mebdd_backend.vbs"></script>
+<script language="VBScript" src="vbgettext.vbs"></script>
 
 <script language="VBScript">
 	Option Explicit
@@ -54,6 +56,7 @@
 	Const REG_INSTALL_KEY = "path_mebdd"
 	Const REG_HKCU_PATH = "Software\MEB Finland\mebdd"
 	Const REG_LAST_TAG_KEY = "LastTag"
+	Const REG_LAST_LANGUAGE_KEY = "LastLanguage"
 	Const LOCALDATA_PATH = "MEB Finland\mebdd"
 	Const IMAGE_SOURCE_LEGEND = 0
 	Const IMAGE_SOURCE_DESCRIPTION = 1
@@ -80,25 +83,65 @@
 	
 	Dim IMAGE_SOURCE
 	Set IMAGE_SOURCE = CreateObject("Scripting.Dictionary")
-	' KTP & KOE
-	IMAGE_SOURCE.Add "digabiktp", Array("Digabi KTP", "Digabin koetilan palvelin (KTP)", "http://kurko.digabi.fi/latest/ktp.zip", "http://kurko.digabi.fi/latest/ktp.zip.md5", Win_GetLocalImageDirectoryPath() & "ktp.dd", REG_HKCU_PATH, "MD5_digabiktp_remote", "MD5_digabiktp_local")
-	IMAGE_SOURCE.Add "digabikoe", Array("Digabi KOE", "Digabin kokelaan päätelaite (KOE)", "http://kurko.digabi.fi/latest/koe.zip", "http://kurko.digabi.fi/latest/koe.zip.md5", Win_GetLocalImageDirectoryPath() & "koe.dd", REG_HKCU_PATH, "MD5_digabikoe_remote", "MD5_digabikoe_local")
-	' DigabiOS demo
-	IMAGE_SOURCE.Add "digabi64", Array("DigabiOS 64bit", "DigabiOS-demokäyttöjärjestelmä, 64 bittinen", "https://digabi.fi/64bit", "https://digabi.fi/64bit/md5", Win_GetLocalImageDirectoryPath() & "DigabiOS-64bit.dd", REG_HKCU_PATH, "MD5_digabi64_remote", "MD5_digabi64_local")
-	IMAGE_SOURCE.Add "digabi32", Array("DigabiOS 32bit", "DigabiOS-demokäyttöjärjestelmä, 32 bittinen", "https://digabi.fi/32bit", "https://digabi.fi/32bit/md5", Win_GetLocalImageDirectoryPath() & "DigabiOS-32bit.dd", REG_HKCU_PATH, "MD5_digabi32_remote", "MD5_digabi32_local")
-	' Local tests
-	'IMAGE_SOURCE.Add "digabiktplocal", Array("Digabi KTP", "Digabin koetilan palvelin (KTP), paikallinen", "http://127.0.0.1:8080/ktp.zip", "http://127.0.0.1:8080/ktp.zip.md5", Win_GetLocalImageDirectoryPath() & "ktp.dd", REG_HKCU_PATH, "MD5_digabiktp_remote_localhost", "MD5_digabiktp_local_localhost")
-	'IMAGE_SOURCE.Add "digabikoelocal", Array("Digabi KOE", "Digabin kokelaan päätelaite (KOE), paikallinen", "http://127.0.0.1:8080/koe.zip", "http://127.0.0.1:8080/koe.zip.md5", Win_GetLocalImageDirectoryPath() & "koe.dd", REG_HKCU_PATH, "MD5_digabikoe_remote_localhost", "MD5_digabikoe_local_localhost")
-	' Do not change these
-	IMAGE_SOURCE.Add "local_zero", Array("Tyhjennä", "Valitse tämä, kun haluat tyhjentää USB-muistit", "", "", Win_GetMEBDDInstallationPath() & "\zero_image.iso", "", "", "")
-	IMAGE_SOURCE.Add "local_image", Array("Paikallinen tiedosto (.iso, .dd)", "<input type=""button"" id=""buttonOpenFile"" value=""Valitse tiedosto"" onClick=""AskImageFilePath()"">", "", "", "", "", "", "")
+	
+	Sub SetImageSources
+		' Remove all existing definitions
+		IMAGE_SOURCE.RemoveAll()
+		
+		' KTP & KOE
+		IMAGE_SOURCE.Add "digabiktp", Array(_
+			VBGT_Get("Digabi exam server"),_
+			VBGT_Get("Digabi exam server (KTP)"),_
+			"http://kurko.digabi.fi/latest/ktp.zip", "http://kurko.digabi.fi/latest/ktp.zip.md5", Win_GetLocalImageDirectoryPath() & "ktp.dd", REG_HKCU_PATH,"MD5_digabiktp_remote", "MD5_digabiktp_local")
+			
+		IMAGE_SOURCE.Add "digabikoe", Array(_
+			VBGT_Get("Digabi exam device"),_
+			VBGT_Get("Digabi exam device (KOE)"),_
+			"http://kurko.digabi.fi/latest/koe.zip", "http://kurko.digabi.fi/latest/koe.zip.md5", Win_GetLocalImageDirectoryPath() & "koe.dd", REG_HKCU_PATH, "MD5_digabikoe_remote", "MD5_digabikoe_local")
+			
+		' DigabiOS demo
+		IMAGE_SOURCE.Add "digabi64", Array(_
+			VBGT_Get("DigabiOS 64bit"),_
+			VBGT_Get("DigabiOS demo operating system, 64 bit"),_
+			"https://digabi.fi/64bit", "https://digabi.fi/64bit/md5", Win_GetLocalImageDirectoryPath() & "DigabiOS-64bit.dd", REG_HKCU_PATH, "MD5_digabi64_remote", "MD5_digabi64_local")
+			
+		IMAGE_SOURCE.Add "digabi32", Array(_
+			VBGT_Get("DigabiOS 32bit"),_
+			VBGT_Get("DigabiOS demo operating system, 32 bit"),_
+			"https://digabi.fi/32bit", "https://digabi.fi/32bit/md5", Win_GetLocalImageDirectoryPath() & "DigabiOS-32bit.dd", REG_HKCU_PATH, "MD5_digabi32_remote", "MD5_digabi32_local")
+
+		' Local tests
+		'IMAGE_SOURCE.Add "digabiktplocal", Array("Digabi KTP", "Digabin koetilan palvelin (KTP), paikallinen", "http://127.0.0.1:8080/ktp.zip", "http://127.0.0.1:8080/ktp.zip.md5", Win_GetLocalImageDirectoryPath() & "ktp.dd", REG_HKCU_PATH, "MD5_digabiktp_remote_localhost", "MD5_digabiktp_local_localhost")
+		'IMAGE_SOURCE.Add "digabikoelocal", Array("Digabi KOE", "Digabin kokelaan päätelaite (KOE), paikallinen", "http://127.0.0.1:8080/koe.zip", "http://127.0.0.1:8080/koe.zip.md5", Win_GetLocalImageDirectoryPath() & "koe.dd", REG_HKCU_PATH, "MD5_digabikoe_remote_localhost", "MD5_digabikoe_local_localhost")
+
+		' Do not change these
+		IMAGE_SOURCE.Add "local_zero", Array(_
+			VBGT_Get("Reset"),_
+			VBGT_Get("Select this to reset USB memories"),_
+			"", "", Win_GetMEBDDInstallationPath() & "\zero_image.iso", "", "", "")
+
+		IMAGE_SOURCE.Add "local_image", Array(_
+			VBGT_Get("Local file (.iso, .dd)"),_
+			"<input type=""button"" id=""buttonOpenFile"" value=""" & VBGT_Get("Select file") & """ onClick=""AskImageFilePath()"">", "", "", "", "", "", "")
+
+	End Sub
+	
+	' Data for language files
+	Dim LANGUAGES
+	Set LANGUAGES = CreateObject("Scripting.Dictionary")
+	LANGUAGES.Add "suomi", Array("fi-FI.po", True)
+	LANGUAGES.Add "svenska", Array("fi-SV.po", False)
+	LANGUAGES.Add "in English", Array("-", False)
 	
 	Dim MEBDD_LOG_FILE_PATH
 	MEBDD_LOG_FILE_PATH = Win_GetEnvironmentString("TEMP") & "\mebdd.txt"
 	
 	Dim strCurrentImageTag
 	strCurrentImageTag = ""
+	
+	Dim intCurrentDriveCount
 
+	' Timer objects for delayed onload and scanning USB disks
 	Dim objTimerOnload, objTimerScandisks
 	
 
@@ -155,21 +198,21 @@
 				
 				strThisRow = strThisRow & "<td><input type=""button""" & _
 					" id=""buttonSelect_" & strThisTag & """" & _
-					" onClick=""Download('" & strThisTag & "')"" value=""Lataa""></td>"
+					" onClick=""Download('" & strThisTag & "')"" value=""" & VBGT_Get("Download") & """></td>"
 			ElseIf (IMAGE_SOURCE(strThisTag)(IMAGE_SOURCE_MD5_REMOTE_REG_KEY) <> "" and strLocalDigest <> strRemoteDigest) Then
 				
 				' Remote image has different digest than local. Offer update (download).
 				
 				strThisRow = strThisRow & "<td><input type=""button""" & _
 					" id=""buttonSelect_" & strThisTag & """" & _
-					" onClick=""Download('" & strThisTag & "')"" value=""Päivitä""></td>"
+					" onClick=""Download('" & strThisTag & "')"" value=""" & VBGT_Get("Update") & """></td>"
 			Else
 			
 				' We have a good local image file. Offer select.
 				
 				strThisRow = strThisRow & "<td><input type=""button""" & _
 					" id=""buttonSelect_" & strThisTag & """" & _
-					" onClick=""SelectImage('" & strThisTag & "')"" value=""Valitse""></td>"
+					" onClick=""SelectImage('" & strThisTag & "')"" value=""" & VBGT_Get("Select") & """></td>"
 			End If
 			
 			strThisRow = strThisRow & "</tr>"
@@ -225,17 +268,76 @@
 			strRadioHTML = strRadioHTML & strRadioItemHTML
 		Next
 		
-		objRadioButtonArea.InnerHTML = strRadioHTML & "<input type=hidden name=formDisk_length value=" & n & ">"
+		intCurrentDriveCount = n
 		
 		If (n = 0) Then
-			objRadioButtonArea.InnerHTML = objRadioButtonArea.InnerHTML & "<p>Varoitus: USB-muisteja ei löytynyt. Liitä yksi tai useampi USB-muisti tietokoneeseen.</p>"
+			objRadioButtonArea.InnerHTML = objRadioButtonArea.InnerHTML & "<p>" & VBGT_Get("No USB memories found. Please insert one or more USB memories to your computer.") & "</p>"
+		Else
+			objRadioButtonArea.InnerHTML = "<p>" & VBGT_Get("Select USB memories to rewrite:") & "</p>" & strRadioHTML
 		End If
 		
 		CheckSelectedDrive
 		
 	End Sub
 	
+	Sub PopulateLanguages
+		Dim strHTML, strLanguage, strLastLanguage
+		
+		' Read former selected language from the registry
+		strLastLanguage = Win_ReadRegKeyHKCU(REG_HKCU_PATH, REG_LAST_LANGUAGE_KEY)
+		
+		If strLastLanguage = "" Then MsgBox "Last Language: '" & strLastLanguage & "'"
+		
+		strHTML = "<select name='objLanguageSelector' onchange='ChangeLanguage()'>"
+		
+		For Each strLanguage In LANGUAGES
+			If (strLastLanguage = "" And LANGUAGES(strLanguage)(1)) Then
+				' Use global default language as the default language
+				strHTML = strHTML & "<option value='" & LANGUAGES(strLanguage)(0) & "' selected>" & strLanguage & "</option>"
+			ElseIf LANGUAGES(strLanguage)(0) = strLastLanguage Then
+				' Use user's default language as the default language
+				strHTML = strHTML & "<option value='" & LANGUAGES(strLanguage)(0) & "' selected>" & strLanguage & "</option>"
+			Else
+				strHTML = strHTML & "<option value='" & LANGUAGES(strLanguage)(0) & "'>" & strLanguage & "</option>"
+			End If
+		Next
+		
+		strHTML = strHTML & "</select>"
+		
+		objLanguageSelectionLayer.InnerHTML = strHTML
+		
+		' Call ChangeLanguage in order to set current default UI language
+		ChangeLanguage
+	End Sub
+	
+	Sub ChangeLanguage
+		' This is called whenever language selection changes
+		' The current code can be read from objLanguageSelector.value
+		
+		' Use new PO file
+		If VBGT_GetPO(objLanguageSelector.value) Then
+			' Store the selected value to user's registry
+			If not Win_WriteRegKeyHKCU(REG_HKCU_PATH, REG_LAST_LANGUAGE_KEY, objLanguageSelector.value) Then
+				LogMessage "Warning: Failed to store user's default language to registry: " & BEnd_LastError
+			End If
+		Else
+			LogMessage "Warning: Could not initialise language file " & objLanguageSelector.value
+		End If
+		
+		' Re-initialise image source names
+		SetImageSources
+
+		' Write language-specific fields to UI
+		objPhase1Heading.InnerHTML = VBGT_Get("Phase 1: Select image to write")
+		objPhase2Heading.InnerHTML = VBGT_Get("Phase 2: Select USB memories")
+		objPhase3Heading.InnerHTML = VBGT_Get("Phase 3: Write USB memories")
+		objPhase3Verify.InnerHTML = VBGT_Get("Verify written USB memories for errors")
+		buttonWriteImage.Value = VBGT_Get("Write USB memories")
+		
+	End Sub
+	
 	Sub ButtonsDisable
+		' FIXME
 		'buttonWriteImage.disabled = True
 		'buttonWriteZeroImage.disabled = True
 		'buttonPopulateDrives.disabled = True
@@ -246,6 +348,7 @@
 	End Sub
 	
 	Sub ButtonsEnable
+		' FIXME
 		'buttonWriteImage.disabled = False
 		'buttonWriteZeroImage.disabled = False
 		'buttonPopulateDrives.disabled = False
@@ -256,21 +359,13 @@
 	End Sub
 	
 	Function GetSelectedDrives ()
-		Dim n, nn, intDriveLength, arrSelectedDrives()
+		Dim n, nn, arrSelectedDrives()
 		
 		ReDim arrSelectedDrives(0)
 		nn=0
 		
-		If not IsObject(formDisk_length) Then
-			' The disk selection menu does not exist
-			GetSelectedDrives = arrSelectedDrives
-			Exit Function
-		End If
-		
-		intDriveLength = formDisk_length.Value
-
-		' Loop through all checkboxes
-		For n = 1 to intDriveLength
+		' Loop through all checkboxes (intCurrentDriveCount is global)
+		For n = 1 to intCurrentDriveCount
 			If Eval("formDisk_" & n & ".Checked") Then
 				nn = nn + 1
 				ReDim Preserve arrSelectedDrives(nn)
@@ -296,7 +391,7 @@
 		
 		' Make sure that strImageTag exists
 		If IMAGE_SOURCE(strImageTag)(IMAGE_SOURCE_LEGEND) = "" Then
-			LogMessage "Tried to download image for tag '" & strImageTag & "' but there is no such image tag"
+			LogMessage BEnd_FMT("Tried to download image for tag '%x' but there is no such image tag", Array(strImageTag))
 			Download = False
 			Exit Function
 		End If
@@ -304,9 +399,8 @@
 		If IMAGE_SOURCE(strImageTag)(IMAGE_SOURCE_URL_MD5) <> "" Then
 			' Download MD5 sum
 			ButtonsDisable
-			ProgressEnable("Ladataan tarkistussumma...")
-			LogMessage "Downloading MD5 sum"
-			LogMessage "MD5-summan lataus käynnistetty (" & IMAGE_SOURCE(strImageTag)(IMAGE_SOURCE_LEGEND) & ")"
+			ProgressEnable(VBGT_Get("Downloading checksum from the server..."))
+			LogMessage "Downloading MD5 sum (" & IMAGE_SOURCE(strImageTag)(IMAGE_SOURCE_LEGEND) & ")"
 			If BEnd_DownloadMD5AndStore( _
 				IMAGE_SOURCE(strImageTag)(IMAGE_SOURCE_URL_MD5), _
 				IMAGE_SOURCE(strImageTag)(IMAGE_SOURCE_MD5_REG_PATH), _
@@ -316,7 +410,7 @@
 			Else
 				' Fail
 				ProgressDisable
-				AppendWriteStatus("MD5-summan lataus epäonnistui, virhekoodi: " & BEnd_LastError)
+				AppendWriteStatus(BEnd_FMT(VBGT_Get("Failed to download checksum from the server. Error code: %x"), Array(BEnd_LastError)))
 				Download = False
 				Exit Function
 			End If
@@ -335,31 +429,31 @@
 		End If
 		
 		' Download image file
-		ProgressEnable("Ladataan levynkuva. Tämä kestää kauan...")
+		ProgressEnable(VBGT_Get("Downloading image data from the server. This takes a long time......"))
 		boolResult = BEnd_DownloadImage(IMAGE_SOURCE(strImageTag)(IMAGE_SOURCE_URL_IMAGE), strLocalFile)
 		ProgressDisable
 		
 		If boolResult Then
-			AppendWriteStatus("Levynkuvan lataus onnistui")
+			AppendWriteStatus(VBGT_Get("Image data downloaded successfully"))
 
 			If IMAGE_SOURCE(strImageTag)(IMAGE_SOURCE_URL_MD5) <> "" Then
 				' The settings contain URL for the MD5 so we check the file integrity
 				
-				ProgressEnable("Tarkistetaan ladattua levynkuvaa...")
+				ProgressEnable(VBGT_Get("Checking downloaded image data..."))
 		
 				' Verify file MD5 to downloaded MD5
 				If BEnd_FileMD5IsEqual(strLocalFile, Win_ReadRegKeyHKCU(IMAGE_SOURCE(strImageTag)(IMAGE_SOURCE_MD5_REG_PATH), IMAGE_SOURCE(strImageTag)(IMAGE_SOURCE_MD5_LOCAL_REG_KEY))) Then
 					' Success
-					AppendWriteStatus("Ladattu levynkuva on virheetön.")
+					AppendWriteStatus(VBGT_Get("There are no errors in the image data."))
 					
 					If boolZIP Then
-						ProgressEnable("Puran ladatun levynkuvan...")
+						ProgressEnable(VBGT_Get("Unpacking the image data..."))
 
 						If not BEnd_Unbox("zip", strLocalFile, IMAGE_SOURCE(strImageTag)(IMAGE_SOURCE_LOCAL_PATH)) Then
 							ProgressDisable
-							AppendWriteStatus("Levynkuvan purkaminen epäonnistui.")
+							AppendWriteStatus(VBGT_Get("Failed to unpack the image data."))
 							LogMessage("Image unboxing failed, error: " & BEnd_LastError)
-							MsgBox "Ladatun levynkuvan purkaminen epäonnistui. Lataa tiedosto uudelleen.", 16, "Virhe"
+							MsgBox VBGT_Get("Failed to unpack the image data. Please download the image data again"), 16, VBGT_Get("Error")
 							
 							' Delete temporary files
 							If Win_FileExists(IMAGE_SOURCE(strImageTag)(IMAGE_SOURCE_LOCAL_PATH)) and not Win_DeleteFile(IMAGE_SOURCE(strImageTag)(IMAGE_SOURCE_LOCAL_PATH)) Then
@@ -379,16 +473,16 @@
 						End If
 						
 						ProgressDisable
-						AppendWriteStatus("Ladattu levynkuva on purettu")
+						AppendWriteStatus(VBGT_Get("The downloaded image data has been unpacked."))
 					End If
 					
 					ProgressDisable
 					Download = True
 				Else
 					' Fail
-					AppendWriteStatus("Levynkuvan tarkistus epäonnistui.")
+					AppendWriteStatus(VBGT_Get("There are errors in the downloaded image data."))
 					LogMessage("Image verify failed, error: " & BEnd_LastError)
-					MsgBox "Ladatussa levynkuvassa on virheitä. Lataa tiedosto uudelleen.", 16, "Virhe"
+					MsgBox VBGT_Get("There are errors in the downloaded image data. Please download the image data again."), 16, VBGT_Get("Error")
 					' Delete failed file & hash
 					boolResult = Win_DeleteFile(IMAGE_SOURCE(strImageTag)(IMAGE_SOURCE_LOCAL_PATH))
 					boolResult = Win_WriteRegKeyHKCU(IMAGE_SOURCE(strImageTag)(IMAGE_SOURCE_MD5_REG_PATH), IMAGE_SOURCE(strImageTag)(IMAGE_SOURCE_MD5_LOCAL_REG_KEY), "")
@@ -406,8 +500,8 @@
 		Else
 			ProgressDisable
 			LogMessage("Image download failed, error: " & BEnd_LastError)
-			AppendWriteStatus("Levynkuvan lataus epäonnistui.")
-			MsgBox "Levynkuvan lataus epäonnistui.", 16, "Virhe"
+			AppendWriteStatus(VBGT_Get("The image data download failed."))
+			MsgBox VBGT_Get("The image data download failed."), 16, VBGT_Get("Error")
 
 			' Delete failed file & hash
 			boolResult = Win_DeleteFile(IMAGE_SOURCE(strImageTag)(IMAGE_SOURCE_LOCAL_PATH))
@@ -430,7 +524,7 @@
 		' Clear write status icon
 		SetWriteStatus(0)
 	
-		strPath = Win_DialogImageFile("Valitse tiedosto", Win_GetLocalImageDirectoryPath(), "*.iso;*.dd")
+		strPath = Win_DialogImageFile(VBGT_Get("Select file"), Win_GetLocalImageDirectoryPath(), "*.iso;*.dd")
 		
 		If strPath <> "" Then
 			' Set file path IMAGE_SOURCE properties
@@ -486,14 +580,14 @@
 		arrSelectedDrives = GetSelectedDrives()
 		
 		If (UBound(arrSelectedDrives) = 0) Then
-			MsgBox "Valitse USB-muisti", 16, "Virhe"
+			MsgBox VBGT_Get("Please select at least one USB memory"), 16, VBGT_Get("Error")
 			Exit Sub
 		End If
 
-		intReturnCode = MsgBox("Varoitus! Tämä toimenpide poistaa kaikki tiedostot valitsemiltasi USB-muisteilta. Oletko varma, että haluat jatkaa?", 1+32+256, "Vahvista")
+		intReturnCode = MsgBox(VBGT_Get("Warning! This operation removes all files from the selected USB memories. Are you sure you want to continue?"), 1+32+256, VBGT_Get("Confirm"))
 		
 		If intReturnCode <> 1 Then
-			MsgBox "Toimenpide peruutettiin", 64, "Peruutus"
+			MsgBox VBGT_Get("Operation cancelled"), 64, VBGT_Get("Cancelled")
 			Exit Sub
 		End If
 		
@@ -506,14 +600,13 @@
 		End If
 		
 		If strCurrentImageTag = "local_zero" Then
-			AppendWriteStatus("Levynkuvan kirjoitus (USB-muistin tyhjennys) on käynnistetty.")
-			ProgressEnable("Tyhjennän USB-muistin/muisteja...")
+			ProgressEnable(VBGT_Get("Now resetting USB memories..."))
 		Else
 			' Store last image path
 			If not Win_WriteLastImageTag(strCurrentImageTag) Then
 				LogMessage("Could not store last selected image: " & Win_LastError)
 			End If
-			ProgressEnable("Kirjoitan USB-muistin/muistit...")
+			ProgressEnable(VBGT_Get("Writing USB memories..."))
 		End If
 
 		boolWriteSuccess = BEnd_WriteImage(strImageFile, arrSelectedDrives, boolVerifyImage)
@@ -524,22 +617,21 @@
 			' Write succeeded
 			SetWriteStatus(1)
 			If strCurrentImageTag = "local_zero" Then
-				AppendWriteStatus("Levynkuvan kirjoitus (USB-muistin tyhjennys) onnistui")
-				MsgBox "USB-muisti on tyhjennetty. Irrota ja liitä muisti takaisin. Hyväksy ehdotus alustuksesta (formatoinnista).", 64
+				AppendWriteStatus(VBGT_Get("Resetting USB memories has finished successfully."))
+				MsgBox VBGT_Get("The USB memories have been reset. Please remove the USB memories and insert them again. Accept the suggestion of formatting the inserted memories."), 64
 			Else
-				AppendWriteStatus("Levynkuvan kirjoitus onnistui")
+				AppendWriteStatus(VBGT_Get("The USB memories have been written successfully"))
 			End If
 		Else
 			' Write Failed
 			SetWriteStatus(-1)
 
 			If BEnd_LastError = "IMAGE_FILE_NOT_FOUND" Then
-				MsgBox "Tiedostoa " & strImageFile & " ei löydy", 16, "Virhe"
+				MsgBox BEnd_FMT(VBGT_Get("File %x was not found"), Array(strImageFile)), 16, VBGT_Get("Error")
 			ElseIf BEnd_LastError = "NO_DRIVES_SELECTED" Then
-				MsgBox "Valitse USB-muisti", 16, "Virhe"
+				MsgBox VBGT_Get("Please select at least one USB memory"), 16, VBGT_Get("Error")
 			Else
-				AppendWriteStatus("Levynkuvan kirjoitus epäonnistui, virhekoodi " & BEnd_LastError & _
-				" <a href='file://" & Win_GetEnvironmentString("TEMP") & "\mebdd.txt'>Avaa lokitiedosto</a>")
+				AppendWriteStatus(BEnd_FMT(VBGT_Get("USB memory write failed. Error code: %x <a href='%x'>Open Log File</a>"), Array(BEnd_LastError, "file://" & Win_GetEnvironmentString("TEMP") & "\mebdd.txt")))
 			End If
 		End If
 	End Sub
@@ -602,7 +694,7 @@
 		window.clearInterval(objTimerOnload)
 		
 		' Enable progress layer
-		ProgressEnable("Tarkistan uusimpia versioita palvelimelta...")
+		ProgressEnable(VBGT_Get("Checking latest versions from the server..."))
 		
 		' Refresh remote versions
 		GetRemoteVersions
@@ -624,6 +716,9 @@
 	' Magically named Window_onLoad is executed when HTA page is loaded
 	Sub Window_onLoad
 		Dim strLastImageTag
+		
+		' Set language options (and write langage-specific fields to UI)
+		PopulateLanguages
 		
 		' Execute time-consuming init things after the screen has been drawn
 		objTimerOnload = window.setInterval("Window_onLoad_Delayed", 1000)
@@ -657,8 +752,9 @@
 </script>
 
 <body onBeforeUnload="Window_OnExit">
+<span id="objLanguageSelectionLayer" class="languageSelectionLayer"></span>
 <table>
-<tr><td colspan="2"><h1>Vaihe 1: Millaisen USB-muistin haluat?</h1></td></tr>
+<tr><td colspan="2"><h1><span id="objPhase1Heading"></span></h1></td></tr>
 <tr>
 	<td id="objStep1Logo" class="cellIcon"></td>
 	<td class="cellText">
@@ -666,23 +762,22 @@
 	</td>
 </tr>
 
-<tr><td colspan="2"><h1>Vaihe 2: Valitse USB-muistit</h1></td></tr>
+<tr><td colspan="2"><h1><span id="objPhase2Heading"></span></h1></td></tr>
 <tr>
 	<td id="objStep2Logo" class="cellIcon"></td>
 	<td class="cellText">
-	<p>Liitä USB-muistit tietokoneeseen ja valitse kirjoitettavat USB-muistit alla olevasta listasta:</p>
 	<span class="radio_disk_normal">
-	<span id="objRadioButtonArea"><input type="hidden" name="formDisk_length" value="0"></span>
+		<span id="objRadioButtonArea"></span>
+	</span>
 	</td>
 </tr>
 
-<tr><td colspan="2"><h1>Vaihe 3: Kirjoita tiedosto USB-muistille</h1></td></tr>
+<tr><td colspan="2"><h1><span id="objPhase3Heading"></span></h1></td></tr>
 <tr>
 	<td id="objStep3Logo" class="cellIcon"></td>
 	<td class="cellText">
-	<p><input type="checkbox" id="checkboxVerify" name="checkboxVerify" checked>Tarkista kirjoitettu USB-muisti kirjoitusvirheiden varalta</p>
-	<p>Kun olet valinnut kopioitavan tiedoston ja käytettävän USB-muistin, napsauta allaolevasta painikkeesta.</p>
-	<input type="button" id="buttonWriteImage" value="Käynnistä USB-muistin kirjoitus" onclick="WriteImage()">
+	<p><input type="checkbox" id="checkboxVerify" name="checkboxVerify" checked><span id="objPhase3Verify"></span></p>
+	<input type="button" id="buttonWriteImage" value="Write" onclick="WriteImage()">
 	<br/><br/>
 	<span id="objWriteStatus"></span>
 	</td>

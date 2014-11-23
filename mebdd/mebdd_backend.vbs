@@ -330,3 +330,48 @@ Function BEnd_InArray(item,A)
      Next 
      BEnd_InArray=False 
  End Function 
+
+' works like the printf-function in C.
+' takes a string with format characters and an array to expand.
+'
+' the format characters are always "%x", independ of the type.
+'
+' usage example:
+'	dim str
+'	str = BEnd_FMT( "hello, Mr. %x, today's date is %x.", Array("Miller",Date) )
+'	response.Write str
+'
+' http://www.codeproject.com/Articles/250/printf-like-Format-Function-in-VBScript
+Function BEnd_FMT( str, args )
+	Dim res		' the result string.
+	res = ""
+
+	Dim pos		' the current position in the args array.
+	pos = 0
+
+	Dim i
+	for i = 1 to Len(str)
+		' found a fmt char.
+		if Mid(str,i,1)="%" then
+			if i<Len(str) then
+				' normal percent.
+				if Mid(str,i+1,1)="%" then
+					res = res & "%"
+					i = i + 1
+
+				' expand from array.
+				elseif Mid(str,i+1,1)="x" then
+					res = res & CStr(args(pos))
+					pos = pos+1
+					i = i + 1
+				end if
+			end if
+
+		' found a normal char.
+		else
+			res = res & Mid(str,i,1)
+		end if
+	next
+
+	fmt = res
+End Function
