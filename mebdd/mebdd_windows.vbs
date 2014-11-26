@@ -107,9 +107,23 @@ Function Win_FileExists (strFilePath)
 	
 	Set objFSO = CreateObject("Scripting.FileSystemObject")
 	If (objFSO.FileExists(strFilePath)) Then
-		Win_FileExists = TRUE
+		Win_FileExists = True
 	Else
-		Win_FileExists = FALSE
+		Win_FileExists = False
+	End If
+End Function
+
+' Checks if given folder exists. Return TRUE if folder exists, otherwise FALSE
+Function Win_FolderExists (strPath)
+	Dim objFSO
+	
+	Win_LastError = ""
+	
+	Set objFSO = CreateObject("Scripting.FileSystemObject")
+	If (objFSO.FolderExists(strFilePath)) Then
+		Win_FolderExists = True
+	Else
+		Win_FolderExists = False
 	End If
 End Function
 
@@ -306,6 +320,34 @@ Function Win_DeleteFile (strFilePath)
 		objFSO.DeleteFile strFilePath
 		Win_DeleteFile = True
 	Else
-		Win_DeleteFile = FALSE
+		Win_DeleteFile = False
+	End If
+End Function
+
+' Delete given folder (strPath). Returns FALSE if given folder does not exist.
+' The function does not distinguish between folders that have contents and those that do not.
+' The specified folder is deleted regardless of whether or not it has contents.
+Function Win_DeleteFolder (strPath)
+	Dim objFSO
+	Set objFSO = CreateObject("Scripting.FileSystemObject")
+	If objFSO.FolderExists(strPath) Then
+		objFSO.DeleteFolder strPath
+		Win_DeleteFolder = True
+	Else
+		Win_DeleteFolder = False
+	End If
+End Function
+
+' Move given file (strSourcePath) to another location (strDestinationPath).
+' Returns FALSE if given strSourcePath does not exists. If move fails creates
+' a run-time error.
+Function Win_MoveFile (strSourcePath, strDestinationPath)
+	Dim objFSO
+	Set objFSO = CreateObject("Scripting.FileSystemObject")
+	If Win_FileExists(strSourcePath) Then
+		Win_MoveFile = True
+		objFSO.MoveFile strSourcePath, strDestinationPath
+	Else
+		Win_MoveFile = False
 	End If
 End Function

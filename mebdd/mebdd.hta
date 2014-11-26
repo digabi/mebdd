@@ -39,6 +39,7 @@
 		
 		.imageTableNormal { font-family: Arial; font-size: 12pt; background-color: white; }
 		.imageTableSelected { font-family: Arial; font-size: 12pt; background-color: grey; }
+		.updateTableNormal { font-family: Arial; font-size: 12pt; background-color: white; }
 		
 		.progressLayer { position: absolute; width: 200px; height: 200px; z-index: 2; left: 200px; top: 200px; margin-left: auto; margin-right: auto; background-color: #ffffff; border-style: solid; border-color: black; font-family: Arial; padding: 20px; }
 		.languageSelectionLayer { float: right; font-family: Arial; color: red; }
@@ -67,6 +68,11 @@
 	Const IMAGE_SOURCE_MD5_REMOTE_REG_KEY = 6
 	Const IMAGE_SOURCE_MD5_LOCAL_REG_KEY = 7
 	
+	' Set image update method. Possible values are:
+	' "individual" - images can be updated individualy
+	' "group" - if any of the images are updated all images must be updated
+	Const IMAGE_UPDATE_METHOD = "group"
+	
 	' NOTE! NOTE! We have to give the FULL PATH for these command-line tools.
 	' Please make sure you change these in case you relocate the utilities.
 	Dim BIN_CURL, BIN_MEBDD_WORKER, BIN_MEBMD5, BIN_UNZIP
@@ -83,48 +89,10 @@
 	
 	Dim IMAGE_SOURCE
 	Set IMAGE_SOURCE = CreateObject("Scripting.Dictionary")
+	SetImageSources
 	
-	Sub SetImageSources
-		' Remove all existing definitions
-		IMAGE_SOURCE.RemoveAll()
-		
-		' KTP & KOE
-		IMAGE_SOURCE.Add "digabiktp", Array(_
-			VBGT_Get("Digabi exam server"),_
-			VBGT_Get("Digabi exam server (KTP)"),_
-			"http://kurko.digabi.fi/latest/ktp.zip", "http://kurko.digabi.fi/latest/ktp.zip.md5", Win_GetLocalImageDirectoryPath() & "ktp.dd", REG_HKCU_PATH,"MD5_digabiktp_remote", "MD5_digabiktp_local")
-			
-		IMAGE_SOURCE.Add "digabikoe", Array(_
-			VBGT_Get("Digabi exam device"),_
-			VBGT_Get("Digabi exam device (KOE)"),_
-			"http://kurko.digabi.fi/latest/koe.zip", "http://kurko.digabi.fi/latest/koe.zip.md5", Win_GetLocalImageDirectoryPath() & "koe.dd", REG_HKCU_PATH, "MD5_digabikoe_remote", "MD5_digabikoe_local")
-			
-		' DigabiOS demo
-		IMAGE_SOURCE.Add "digabi64", Array(_
-			VBGT_Get("DigabiOS 64bit"),_
-			VBGT_Get("DigabiOS demo operating system, 64 bit"),_
-			"https://digabi.fi/64bit", "https://digabi.fi/64bit/md5", Win_GetLocalImageDirectoryPath() & "DigabiOS-64bit.dd", REG_HKCU_PATH, "MD5_digabi64_remote", "MD5_digabi64_local")
-			
-		IMAGE_SOURCE.Add "digabi32", Array(_
-			VBGT_Get("DigabiOS 32bit"),_
-			VBGT_Get("DigabiOS demo operating system, 32 bit"),_
-			"https://digabi.fi/32bit", "https://digabi.fi/32bit/md5", Win_GetLocalImageDirectoryPath() & "DigabiOS-32bit.dd", REG_HKCU_PATH, "MD5_digabi32_remote", "MD5_digabi32_local")
-
-		' Local tests
-		'IMAGE_SOURCE.Add "digabiktplocal", Array("Digabi KTP", "Digabin koetilan palvelin (KTP), paikallinen", "http://127.0.0.1:8080/ktp.zip", "http://127.0.0.1:8080/ktp.zip.md5", Win_GetLocalImageDirectoryPath() & "ktp.dd", REG_HKCU_PATH, "MD5_digabiktp_remote_localhost", "MD5_digabiktp_local_localhost")
-		'IMAGE_SOURCE.Add "digabikoelocal", Array("Digabi KOE", "Digabin kokelaan p‰‰telaite (KOE), paikallinen", "http://127.0.0.1:8080/koe.zip", "http://127.0.0.1:8080/koe.zip.md5", Win_GetLocalImageDirectoryPath() & "koe.dd", REG_HKCU_PATH, "MD5_digabikoe_remote_localhost", "MD5_digabikoe_local_localhost")
-
-		' Do not change these
-		IMAGE_SOURCE.Add "local_zero", Array(_
-			VBGT_Get("Reset"),_
-			VBGT_Get("Select this to reset USB memories"),_
-			"", "", Win_GetMEBDDInstallationPath() & "\zero_image.iso", "", "", "")
-
-		IMAGE_SOURCE.Add "local_image", Array(_
-			VBGT_Get("Local file (.iso, .dd)"),_
-			"<input type=""button"" id=""buttonOpenFile"" value=""" & VBGT_Get("Select file") & """ onClick=""AskImageFilePath()"">", "", "", "", "", "", "")
-
-	End Sub
+	Dim strCurrentImageTag
+	strCurrentImageTag = ""
 	
 	' Data for language files
 	Dim LANGUAGES
@@ -132,12 +100,12 @@
 	LANGUAGES.Add "suomi", Array("fi-FI.po", True)
 	LANGUAGES.Add "svenska", Array("fi-SV.po", False)
 	LANGUAGES.Add "in English", Array("-", False)
+
+	Dim strCurrentLanguageName
+	strCurrentLanguageName = ""
 	
 	Dim MEBDD_LOG_FILE_PATH
 	MEBDD_LOG_FILE_PATH = Win_GetEnvironmentString("TEMP") & "\mebdd.txt"
-	
-	Dim strCurrentImageTag
-	strCurrentImageTag = ""
 	
 	Dim intCurrentDriveCount
 
@@ -145,6 +113,47 @@
 	Dim objTimerOnload, objTimerScandisks
 	
 
+	Sub SetImageSources
+		' Remove all existing definitions
+		IMAGE_SOURCE.RemoveAll()
+		
+		' KTP & KOE
+		'IMAGE_SOURCE.Add "ktp", Array(_
+		'	VBGT_Get("Digabi exam server"),_
+		'	VBGT_Get("Digabi exam server (KTP)"),_
+		'	"http://kurko.digabi.fi/latest/ktp.zip", "http://kurko.digabi.fi/latest/ktp.zip.md5", Win_GetLocalImageDirectoryPath() & "ktp.dd",_
+		'	REG_HKCU_PATH,"MD5_digabiktp_remote", "MD5_digabiktp_local")
+			
+		'IMAGE_SOURCE.Add "koe", Array(_
+		'	VBGT_Get("Digabi exam device"),_
+		'	VBGT_Get("Digabi exam device (KOE)"),_
+		'	"http://kurko.digabi.fi/latest/koe.zip", "http://kurko.digabi.fi/latest/koe.zip.md5", Win_GetLocalImageDirectoryPath() & "koe.dd",_
+		'	REG_HKCU_PATH, "MD5_digabikoe_remote", "MD5_digabikoe_local")
+		
+		' DigabiOS demo
+		'IMAGE_SOURCE.Add "digabi64", Array(_
+		'	VBGT_Get("DigabiOS 64bit"),_
+		'	VBGT_Get("DigabiOS demo operating system, 64 bit"),_
+		'	"https://digabi.fi/64bit", "https://digabi.fi/64bit/md5", Win_GetLocalImageDirectoryPath() & "DigabiOS-64bit.dd",_
+		'	REG_HKCU_PATH, "MD5_digabi64_remote", "MD5_digabi64_local")
+			
+		'IMAGE_SOURCE.Add "digabi32", Array(_
+		'	VBGT_Get("DigabiOS 32bit"),_
+		'	VBGT_Get("DigabiOS demo operating system, 32 bit"),_
+		'	"https://digabi.fi/32bit", "https://digabi.fi/32bit/md5", Win_GetLocalImageDirectoryPath() & "DigabiOS-32bit.dd",_
+		'	REG_HKCU_PATH, "MD5_digabi32_remote", "MD5_digabi32_local")
+
+		' Local tests
+		IMAGE_SOURCE.Add "ktplocal", Array("Digabi KTP", "Digabin koetilan palvelin (KTP), paikallinen", "http://127.0.0.1:8080/ktp.zip", "http://127.0.0.1:8080/ktp.zip.md5", Win_GetLocalImageDirectoryPath() & "ktp.dd", REG_HKCU_PATH, "MD5_ktplocal_remote", "MD5_ktplocal_local")
+		IMAGE_SOURCE.Add "koelocal", Array("Digabi KOE", "Digabin kokelaan p‰‰telaite (KOE), paikallinen", "http://127.0.0.1:8080/koe.zip", "http://127.0.0.1:8080/koe.zip.md5", Win_GetLocalImageDirectoryPath() & "koe.dd", REG_HKCU_PATH, "MD5_koelocal_remote", "MD5_koelocal_local")
+
+		' Do not change these
+		'IMAGE_SOURCE.Add "local_zero", Array(VBGT_Get("Reset"),VBGT_Get("Select this to reset USB memories"), "", "", Win_GetMEBDDInstallationPath() & "\zero_image.iso", "", "", "")
+
+		'IMAGE_SOURCE.Add "local_image", Array(VBGT_Get("Local file (.iso, .dd)"),"<input type=""button"" id=""buttonOpenFile"" value=""" & VBGT_Get("Select file") & """ onClick=""AskImageFilePath()"">", "", "", "", "", "", "")
+
+	End Sub
+	
 	' Append given message to MEBDD_LOG_FILE_PATH
 	Sub LogMessage (strMessage)
 		Dim objFSO, objFile
@@ -176,10 +185,93 @@
 		Next
 	End Sub
 
+	' Populates image update table from IMAGE_SOURCE (hash array) to
+	' objImageUpdateTable (HTML object)
+	Sub PopulateUpdates
+		Dim strTable, strThisRow, strThisTag, strActionCell, arrUpdates(), intUpdates
+		Dim strLocalDigest, strRemoteDigest
+		
+		intUpdates = 0
+		
+		strTable = "<table>"
+		
+		For Each strThisTag in IMAGE_SOURCE
+			strThisRow = "<tr id=""objUpdateTableRow_" & strThisTag & """ class=""updateTableNormal"">"
+			
+			strThisRow = strThisRow & "<td>" & IMAGE_SOURCE(strThisTag)(IMAGE_SOURCE_LEGEND) & "</td>"
+			strThisRow = strThisRow & "<td>" & IMAGE_SOURCE(strThisTag)(IMAGE_SOURCE_DESCRIPTION) & "</td>"
+
+			strLocalDigest = Win_ReadRegKeyHKCU(IMAGE_SOURCE(strThisTag)(IMAGE_SOURCE_MD5_REG_PATH), IMAGE_SOURCE(strThisTag)(IMAGE_SOURCE_MD5_LOCAL_REG_KEY))
+			strRemoteDigest = Win_ReadRegKeyHKCU(IMAGE_SOURCE(strThisTag)(IMAGE_SOURCE_MD5_REG_PATH), IMAGE_SOURCE(strThisTag)(IMAGE_SOURCE_MD5_REMOTE_REG_KEY))
+			
+			' Create action button
+			strActionCell = ""
+			If (not Win_FileExists(IMAGE_SOURCE(strThisTag)(IMAGE_SOURCE_LOCAL_PATH)) and strThisTag <> "local_image") Then
+			
+				' The image file does not exist. Offer download.
+				
+				If IMAGE_UPDATE_METHOD = "individual" Then
+					strActionCell = "<td><input type=""button""" & _
+						" id=""buttonSelect_" & strThisTag & """" & _
+						" onClick=""Download('" & strThisTag & "')"" value=""" & VBGT_Get("Download") & """></td>"
+				ElseIf IMAGE_UPDATE_METHOD = "group" Then
+					strActionCell = "<td>" & VBGT_Get("Download required") & "</td>"
+					' Add current tag to array of images to update
+					ReDim Preserve arrUpdates(intUpdates)
+					arrUpdates(intUpdates) = """" & strThisTag & """"
+					intUpdates = intUpdates + 1
+				End If
+				
+			ElseIf (IMAGE_SOURCE(strThisTag)(IMAGE_SOURCE_MD5_REMOTE_REG_KEY) <> "" and strLocalDigest <> strRemoteDigest) Then
+				
+				' Remote image has different digest than local. Offer update (download).
+				
+				If IMAGE_UPDATE_METHOD = "individual" Then
+					strActionCell = "<td><input type=""button""" & _
+						" id=""buttonSelect_" & strThisTag & """" & _
+						" onClick=""Download('" & strThisTag & "')"" value=""" & VBGT_Get("Update") & """></td>"
+				ElseIf IMAGE_UPDATE_METHOD = "group" Then
+					strActionCell = "<td>" & VBGT_Get("Update available") & "</td>"
+					' Add current tag to array of images to update
+					ReDim Preserve arrUpdates(intUpdates)
+					arrUpdates(intUpdates) = """" & strThisTag & """"
+					intUpdates = intUpdates + 1
+				End If
+			Else
+			
+				' We have a good local image file.
+
+				If IMAGE_UPDATE_METHOD = "individual" Then
+					strActionCell = "<td>" & VBGT_Get("Up to date") & "</td>"
+				ElseIf IMAGE_UPDATE_METHOD = "group" Then
+					strActionCell = "<td>" & VBGT_Get("Up to date") & "</td>"
+				End If
+			End If
+
+			strThisRow = strThisRow & strActionCell & "</tr>"
+			
+			strTable = strTable & strThisRow
+		Next
+		
+		strTable = strTable & "</table>"
+		
+		If IMAGE_UPDATE_METHOD = "group" Then
+			If intUpdates > 0 Then
+				objImageGroupUpdate.InnerHTML = "<p>" & VBGT_Get("There are updates available for the image files.") & _
+					"<input type='button' onClick='Download(Array(" & join(arrUpdates, ",") & "))' value='" & _
+					VBGT_Get("Download updates") & "'></p>"
+			Else
+				objImageGroupUpdate.InnerHTML = "<p>" & VBGT_Get("Image files are up to date!") & "</p>"
+			End If
+		End If
+		
+		objImageUpdateTable.InnerHTML = strTable
+	End Sub
+	
 	' Populates image selection table from IMAGE_SOURCE (hash array) to
 	' objImageSelectionTable (HTML object)
 	Sub PopulateImages
-		Dim strThisTag, strThisRow, strTable, strLocalDigest, strRemoteDigest
+		Dim strThisTag, strThisRow, strTable, strActionCell
 		
 		strTable = "<table>"
 		
@@ -188,34 +280,19 @@
 			strThisRow = strThisRow & "<td>" & IMAGE_SOURCE(strThisTag)(IMAGE_SOURCE_LEGEND) & "</td>"
 			strThisRow = strThisRow & "<td>" & IMAGE_SOURCE(strThisTag)(IMAGE_SOURCE_DESCRIPTION) & "</td>"
 			
-			strLocalDigest = Win_ReadRegKeyHKCU(IMAGE_SOURCE(strThisTag)(IMAGE_SOURCE_MD5_REG_PATH), IMAGE_SOURCE(strThisTag)(IMAGE_SOURCE_MD5_LOCAL_REG_KEY))
-			strRemoteDigest = Win_ReadRegKeyHKCU(IMAGE_SOURCE(strThisTag)(IMAGE_SOURCE_MD5_REG_PATH), IMAGE_SOURCE(strThisTag)(IMAGE_SOURCE_MD5_REMOTE_REG_KEY))
-			
 			' Create action button
+			strActionCell = ""
 			If (not Win_FileExists(IMAGE_SOURCE(strThisTag)(IMAGE_SOURCE_LOCAL_PATH)) and strThisTag <> "local_image") Then
 			
-				' The image file does not exist. Offer download.
-				
-				strThisRow = strThisRow & "<td><input type=""button""" & _
-					" id=""buttonSelect_" & strThisTag & """" & _
-					" onClick=""Download('" & strThisTag & "')"" value=""" & VBGT_Get("Download") & """></td>"
-			ElseIf (IMAGE_SOURCE(strThisTag)(IMAGE_SOURCE_MD5_REMOTE_REG_KEY) <> "" and strLocalDigest <> strRemoteDigest) Then
-				
-				' Remote image has different digest than local. Offer update (download).
-				
-				strThisRow = strThisRow & "<td><input type=""button""" & _
-					" id=""buttonSelect_" & strThisTag & """" & _
-					" onClick=""Download('" & strThisTag & "')"" value=""" & VBGT_Get("Update") & """></td>"
+				' The image file does not exist.
+				strActionCell = "<td>" & VBGT_Get("Missing") & "</td>"
 			Else
-			
-				' We have a good local image file. Offer select.
-				
-				strThisRow = strThisRow & "<td><input type=""button""" & _
+				strActionCell = "<td><input type=""button""" & _
 					" id=""buttonSelect_" & strThisTag & """" & _
 					" onClick=""SelectImage('" & strThisTag & "')"" value=""" & VBGT_Get("Select") & """></td>"
 			End If
 			
-			strThisRow = strThisRow & "</tr>"
+			strThisRow = strThisRow & strActionCell & "</tr>"
 				
 			strTable = strTable & strThisRow
 		Next
@@ -226,33 +303,41 @@
 	End Sub
 	
 	Sub PopulateDrives
-		Dim n, arrSelectedDrives
+		Dim n, arrWriteSelectedDrives, arrRemoveSelectedDrives
+		Dim objWMIService, colDiskDrives, objDiskDrive, strWriteRadioHTML, strRemoveRadioHTML, strRadioClass
+		Dim strWriteRadioChecked, strRemoveRadioChecked
+		
 		n = 0
 		
 		' Check selected drives before scanning new drives
-		arrSelectedDrives = GetSelectedDrives()
+		arrWriteSelectedDrives = GetSelectedDrives("write")
+		arrRemoveSelectedDrives = GetSelectedDrives("remove")
 		
 		' Clear write status icon
 		SetWriteStatus(0)
 		
 		' Reset radio buttons
-		objRadioButtonArea.InnerHTML = ""
-		
-		Dim objWMIService, colDiskDrives, objDiskDrive, strRadioHTML, strRadioItemHTML, strRadioClass, strRadioChecked
+		objWriteRadioButtonArea.InnerHTML = ""
+		objRemoveRadioButtonArea.InnerHTML = ""
 		
 		Set objWMIService = GetObject("winmgmts:{impersonationLevel=impersonate}!\\.\root\cimv2")
 		'Set colDiskDrives = objWMIService.ExecQuery ("Select * from Win32_DiskDrive Where MediaType=""Removable Media""")
 		Set colDiskDrives = objWMIService.ExecQuery ("Select * from Win32_DiskDrive Where MediaType Like ""Removable Media%""")
 		
-		strRadioHTML = ""
+		strWriteRadioHTML = ""
+		strRemoveRadioHTML = ""
 
 		For each objDiskDrive in colDiskDrives
 			n = n + 1
 			
 			' Pre-check drives which were already selected
-			strRadioChecked = ""
-			If BEnd_InArray(objDiskDrive.DeviceID, arrSelectedDrives) Then
-				strRadioChecked = " checked"
+			strWriteRadioChecked = ""
+			strRemoveRadioChecked = ""
+			If BEnd_InArray(objDiskDrive.DeviceID, arrWriteSelectedDrives) Then
+				strWriteRadioChecked = " checked"
+			End If
+			If BEnd_InArray(objDiskDrive.DeviceID, arrRemoveSelectedDrives) Then
+				strRemoveRadioChecked = " checked"
 			End If
 			
 
@@ -263,17 +348,19 @@
 				strRadioClass = "radio_disk_warning"
 			End If
 			
-			strRadioItemHTML = "<span class=" & strRadioClass & "><input type=checkbox name=formDisk_" & n & " value=" & Chr(34) & objDiskDrive.DeviceID & Chr(34) & " onclick=""CheckSelectedDrive"" " & strRadioChecked & ">" & objDiskDrive.Model & ", " & objDiskDrive.Caption & " (" & BEnd_ConvertSize(objDiskDrive.Size) & ")</span><br/>"
+			strWriteRadioHTML = strWriteRadioHTML & "<span class=" & strRadioClass & "><input type=checkbox name=formWriteDisk_" & n & " value=" & Chr(34) & objDiskDrive.DeviceID & Chr(34) & " onclick=""CheckSelectedDrive"" " & strWriteRadioChecked & ">" & objDiskDrive.Model & ", " & objDiskDrive.Caption & " (" & BEnd_ConvertSize(objDiskDrive.Size) & ")</span><br/>"
 			
-			strRadioHTML = strRadioHTML & strRadioItemHTML
+			strRemoveRadioHTML = strRemoveRadioHTML & "<span class=" & strRadioClass & "><input type=checkbox name=formRemoveDisk_" & n & " value=" & Chr(34) & objDiskDrive.DeviceID & Chr(34) & " onclick=""CheckSelectedDrive"" " & strRemoveRadioChecked & ">" & objDiskDrive.Model & ", " & objDiskDrive.Caption & " (" & BEnd_ConvertSize(objDiskDrive.Size) & ")</span><br/>"
 		Next
 		
 		intCurrentDriveCount = n
 		
 		If (n = 0) Then
-			objRadioButtonArea.InnerHTML = objRadioButtonArea.InnerHTML & "<p>" & VBGT_Get("No USB memories found. Please insert one or more USB memories to your computer.") & "</p>"
+			objWriteRadioButtonArea.InnerHTML = "<p>" & VBGT_Get("No USB memories found. Please insert one or more USB memories to your computer.") & "</p>"
+			objRemoveRadioButtonArea.InnerHTML = "<p>" & VBGT_Get("No USB memories found. Please insert one or more USB memories to your computer.") & "</p>"
 		Else
-			objRadioButtonArea.InnerHTML = "<p>" & VBGT_Get("Select USB memories to rewrite:") & "</p>" & strRadioHTML
+			objWriteRadioButtonArea.InnerHTML = "<p>" & VBGT_Get("Select USB memories to write:") & "</p>" & strWriteRadioHTML
+			objRemoveRadioButtonArea.InnerHTML = "<p>" & VBGT_Get("Select USB memories to undo:") & "</p>" & strRemoveRadioHTML
 		End If
 		
 		CheckSelectedDrive
@@ -281,24 +368,19 @@
 	End Sub
 	
 	Sub PopulateLanguages
-		Dim strHTML, strLanguage, strLastLanguage
-		
-		' Read former selected language from the registry
-		strLastLanguage = Win_ReadRegKeyHKCU(REG_HKCU_PATH, REG_LAST_LANGUAGE_KEY)
-		
-		If strLastLanguage = "" Then MsgBox "Last Language: '" & strLastLanguage & "'"
+		Dim strHTML, strLanguage
 		
 		strHTML = "<select name='objLanguageSelector' onchange='ChangeLanguage()'>"
 		
 		For Each strLanguage In LANGUAGES
-			If (strLastLanguage = "" And LANGUAGES(strLanguage)(1)) Then
+			If (strCurrentLanguageName = "" And LANGUAGES(strLanguage)(1)) Then
 				' Use global default language as the default language
-				strHTML = strHTML & "<option value='" & LANGUAGES(strLanguage)(0) & "' selected>" & strLanguage & "</option>"
-			ElseIf LANGUAGES(strLanguage)(0) = strLastLanguage Then
+				strHTML = strHTML & "<option value='" & strLanguage & "' selected>" & strLanguage & "</option>"
+			ElseIf strLanguage = strCurrentLanguageName Then
 				' Use user's default language as the default language
-				strHTML = strHTML & "<option value='" & LANGUAGES(strLanguage)(0) & "' selected>" & strLanguage & "</option>"
+				strHTML = strHTML & "<option value='" & strLanguage & "' selected>" & strLanguage & "</option>"
 			Else
-				strHTML = strHTML & "<option value='" & LANGUAGES(strLanguage)(0) & "'>" & strLanguage & "</option>"
+				strHTML = strHTML & "<option value='" & strLanguage & "'>" & strLanguage & "</option>"
 			End If
 		Next
 		
@@ -313,27 +395,32 @@
 	Sub ChangeLanguage
 		' This is called whenever language selection changes
 		' The current code can be read from objLanguageSelector.value
+		Dim strPOFile
 		
 		' Use new PO file
-		If VBGT_GetPO(objLanguageSelector.value) Then
+		strPOFile = LANGUAGES(objLanguageSelector.value)(0)
+		
+		If VBGT_GetPO(strPOFile) Then
 			' Store the selected value to user's registry
 			If not Win_WriteRegKeyHKCU(REG_HKCU_PATH, REG_LAST_LANGUAGE_KEY, objLanguageSelector.value) Then
 				LogMessage "Warning: Failed to store user's default language to registry: " & BEnd_LastError
 			End If
 		Else
-			LogMessage "Warning: Could not initialise language file " & objLanguageSelector.value
+			LogMessage "Warning: Could not initialise language file " & strPOFile
 		End If
 		
 		' Re-initialise image source names
 		SetImageSources
 
 		' Write language-specific fields to UI
-		objPhase1Heading.InnerHTML = VBGT_Get("Phase 1: Select image to write")
-		objPhase2Heading.InnerHTML = VBGT_Get("Phase 2: Select USB memories")
-		objPhase3Heading.InnerHTML = VBGT_Get("Phase 3: Write USB memories")
-		objPhase3Verify.InnerHTML = VBGT_Get("Verify written USB memories for errors")
+		objPhase1Heading.InnerHTML = VBGT_Get("Phase 1: Update image files")
+		objPhase2Heading.InnerHTML = VBGT_Get("Phase 2: Select image to write")
+		objPhase3Heading.InnerHTML = VBGT_Get("Phase 3: Select USB memories")
+		objPhase4Heading.InnerHTML = VBGT_Get("Phase 4: Write USB memories")
+		objPhase4Verify.InnerHTML = VBGT_Get("Verify written USB memories for errors")
 		buttonWriteImage.Value = VBGT_Get("Write USB memories")
-		
+		objPhase5Heading.InnerHTML = VBGT_Get("Phase 5: Remove image from USB memories")
+		buttonRemoveImage.Value = VBGT_Get("Remove image")
 	End Sub
 	
 	Sub ButtonsDisable
@@ -358,18 +445,29 @@
 		' formImageName.disabled = False
 	End Sub
 	
-	Function GetSelectedDrives ()
-		Dim n, nn, arrSelectedDrives()
+	' enumerate selected drives from given radio button group
+	' strRadioType can be either "write" or "remove"
+	Function GetSelectedDrives (strRadioType)
+		Dim n, nn, arrSelectedDrives(), strRadioPrefix
+		
+		If strRadioType = "write" Then
+			strRadioPrefix = "formWriteDisk_"
+		ElseIf strRadioType = "remove" Then
+			strRadioPrefix = "formRemoveDisk_"
+		Else
+			LogMessage("Warning: GetSelectedDrives called with unknown radio type: " & strRadioType)
+			strRadioPrefix = "formWriteDisk_"
+		End If
 		
 		ReDim arrSelectedDrives(0)
 		nn=0
 		
 		' Loop through all checkboxes (intCurrentDriveCount is global)
 		For n = 1 to intCurrentDriveCount
-			If Eval("formDisk_" & n & ".Checked") Then
+			If Eval(strRadioPrefix & n & ".Checked") Then
 				nn = nn + 1
 				ReDim Preserve arrSelectedDrives(nn)
-				arrSelectedDrives(nn) = Eval("formDisk_" & n & ".value")
+				arrSelectedDrives(nn) = Eval(strRadioPrefix & n & ".value")
 			End If
 			SetWriteStatus(0)
 		Next
@@ -381,7 +479,21 @@
 	' If the IMAGE_SOURCE_URL_IMAGE of the given [strImageTag] is empty, does not download and returns SUCCESS
 	' If the IMAGE_SOURCE_URL_MD5 of the given [strImageTag] is empty, does not verify MD5
 	Function Download (strImageTag)
-		Dim boolResult, boolZIP, strLocalFile
+		Dim boolResult, boolZIP, strLocalPath, strLocalFile, strThisImageTag
+		
+		' If strImageTag is an array call self with all values in that array
+		If IsArray(strImageTag) Then
+			For Each strThisImageTag in strImageTag
+				If not Download(strThisImageTag) Then
+					' Download failed - fail all downloads
+					Download = False
+					Exit Function
+				End If
+			Next
+			
+			Download = True
+			Exit Function
+		End If
 		
 		' Quit if image URL is empty and return Success
 		If IMAGE_SOURCE(strImageTag)(IMAGE_SOURCE_URL_IMAGE) = "" Then
@@ -390,7 +502,7 @@
 		End If
 		
 		' Make sure that strImageTag exists
-		If IMAGE_SOURCE(strImageTag)(IMAGE_SOURCE_LEGEND) = "" Then
+		If not IMAGE_SOURCE.Exists(strImageTag) Then
 			LogMessage BEnd_FMT("Tried to download image for tag '%x' but there is no such image tag", Array(strImageTag))
 			Download = False
 			Exit Function
@@ -399,7 +511,7 @@
 		If IMAGE_SOURCE(strImageTag)(IMAGE_SOURCE_URL_MD5) <> "" Then
 			' Download MD5 sum
 			ButtonsDisable
-			ProgressEnable(VBGT_Get("Downloading checksum from the server..."))
+			ProgressEnable(BEnd_FMT(VBGT_Get("Downloading checksum of image '%x' from the server..."), Array(IMAGE_SOURCE(strImageTag)(IMAGE_SOURCE_LEGEND))))
 			LogMessage "Downloading MD5 sum (" & IMAGE_SOURCE(strImageTag)(IMAGE_SOURCE_LEGEND) & ")"
 			If BEnd_DownloadMD5AndStore( _
 				IMAGE_SOURCE(strImageTag)(IMAGE_SOURCE_URL_MD5), _
@@ -417,19 +529,23 @@
 			ProgressDisable
 		End If
 		
+		' Create a local temporary path to store files
+		strLocalPath = Win_GetTempFilename()
+		Win_CreateDirs(strLocalPath)
+		
 		' Are we downloading a zip?
 		If UCase(Win_GetFileExtension(IMAGE_SOURCE(strImageTag)(IMAGE_SOURCE_URL_IMAGE))) = "ZIP" Then
 			' Create a temporary filename for the zip file
-			strLocalFile = Win_GetTempFilename()
+			strLocalFile = strLocalPath & "\" & Win_GetBasename(Win_GetTempFilename())
 			boolZIP = True
 			LogMessage "Created temporary file for ZIP: " & strImageTag
 		Else
-			strLocalFile = IMAGE_SOURCE(strImageTag)(IMAGE_SOURCE_LOCAL_PATH)
+			strLocalFile = strLocalPath & "\" & Win_GetBasename(Win_GetTempFilename())
 			boolZIP = False
 		End If
 		
 		' Download image file
-		ProgressEnable(VBGT_Get("Downloading image data from the server. This takes a long time......"))
+		ProgressEnable(BEnd_FMT(VBGT_Get("Downloading image '%x' data from the server. This takes a long time..."), Array(IMAGE_SOURCE(strImageTag)(IMAGE_SOURCE_LEGEND))))
 		boolResult = BEnd_DownloadImage(IMAGE_SOURCE(strImageTag)(IMAGE_SOURCE_URL_IMAGE), strLocalFile)
 		ProgressDisable
 		
@@ -439,7 +555,7 @@
 			If IMAGE_SOURCE(strImageTag)(IMAGE_SOURCE_URL_MD5) <> "" Then
 				' The settings contain URL for the MD5 so we check the file integrity
 				
-				ProgressEnable(VBGT_Get("Checking downloaded image data..."))
+				ProgressEnable(BEnd_FMT(VBGT_Get("Checking downloaded image '%x' data..."), Array(IMAGE_SOURCE(strImageTag)(IMAGE_SOURCE_LEGEND))))
 		
 				' Verify file MD5 to downloaded MD5
 				If BEnd_FileMD5IsEqual(strLocalFile, Win_ReadRegKeyHKCU(IMAGE_SOURCE(strImageTag)(IMAGE_SOURCE_MD5_REG_PATH), IMAGE_SOURCE(strImageTag)(IMAGE_SOURCE_MD5_LOCAL_REG_KEY))) Then
@@ -447,33 +563,29 @@
 					AppendWriteStatus(VBGT_Get("There are no errors in the image data."))
 					
 					If boolZIP Then
-						ProgressEnable(VBGT_Get("Unpacking the image data..."))
+						ProgressEnable(BEnd_FMT(VBGT_Get("Unpacking the image '%x' data..."), Array(IMAGE_SOURCE(strImageTag)(IMAGE_SOURCE_LEGEND))))
 
-						If not BEnd_Unbox("zip", strLocalFile, IMAGE_SOURCE(strImageTag)(IMAGE_SOURCE_LOCAL_PATH)) Then
+						If not BEnd_Unbox("zip", strLocalFile, strLocalPath & "\" & Win_GetBasename(IMAGE_SOURCE(strImageTag)(IMAGE_SOURCE_LOCAL_PATH))) Then
 							ProgressDisable
 							AppendWriteStatus(VBGT_Get("Failed to unpack the image data."))
 							LogMessage("Image unboxing failed, error: " & BEnd_LastError)
 							MsgBox VBGT_Get("Failed to unpack the image data. Please download the image data again"), 16, VBGT_Get("Error")
 							
-							' Delete temporary files
-							If Win_FileExists(IMAGE_SOURCE(strImageTag)(IMAGE_SOURCE_LOCAL_PATH)) and not Win_DeleteFile(IMAGE_SOURCE(strImageTag)(IMAGE_SOURCE_LOCAL_PATH)) Then
-								LogMessage("Warning: Could not remove failed image file " & IMAGE_SOURCE(strImageTag)(IMAGE_SOURCE_LOCAL_PATH))
+							' Delete temporary folder
+							If Win_FolderExists(strLocalPath) and not Win_DeleteFolder(strLocalPath) Then
+								LogMessage("Warning: Could not remove temporary folder " & strLocalPath)
 							End If
 							
-							If Win_FileExists(strLocalFile) and not Win_DeleteFile(strLocalFile) Then
-								LogMessage("Warning: Could not remove local temporary zip file " & strLocalFile)
-							End If
-
 							Download = False
 							Exit Function
 						End If
 						
-						If Win_FileExists(strLocalFile) and not Win_DeleteFile(strLocalFile) Then
-							LogMessage("Warning: Could not remove local temporary zip file " & strLocalFile)
-						End If
-						
 						ProgressDisable
 						AppendWriteStatus(VBGT_Get("The downloaded image data has been unpacked."))
+						
+						' Before this strLocalFile points to downloaded zip
+						' After this it should point to extracted image file
+						strLocalFile = strLocalPath & "\" & Win_GetBasename(IMAGE_SOURCE(strImageTag)(IMAGE_SOURCE_LOCAL_PATH))
 					End If
 					
 					ProgressDisable
@@ -483,9 +595,10 @@
 					AppendWriteStatus(VBGT_Get("There are errors in the downloaded image data."))
 					LogMessage("Image verify failed, error: " & BEnd_LastError)
 					MsgBox VBGT_Get("There are errors in the downloaded image data. Please download the image data again."), 16, VBGT_Get("Error")
-					' Delete failed file & hash
-					boolResult = Win_DeleteFile(IMAGE_SOURCE(strImageTag)(IMAGE_SOURCE_LOCAL_PATH))
-					boolResult = Win_WriteRegKeyHKCU(IMAGE_SOURCE(strImageTag)(IMAGE_SOURCE_MD5_REG_PATH), IMAGE_SOURCE(strImageTag)(IMAGE_SOURCE_MD5_LOCAL_REG_KEY), "")
+					' Delete failed temporary path
+					If not Win_DeleteFolder(Win_GetPathName(strLocalFile)) Then
+						LogMessage("Warning: Could not remove temporary folder " & Win_GetPathName(strLocalFile))
+					End If
 					
 					ProgressDisable
 					Download = False
@@ -513,8 +626,29 @@
 		
 		ProgressDisable
 		
+		' The image is now in strLocalFile. As everything has gone well we can now replace the
+		' existing image file with the new one
+		ProgressEnable(VBGT_Get("Removing previous image file..."))
+		If Win_FileExists(IMAGE_SOURCE(strImageTag)(IMAGE_SOURCE_LOCAL_PATH)) and not Win_DeleteFile(IMAGE_SOURCE(strImageTag)(IMAGE_SOURCE_LOCAL_PATH)) Then
+			LogMessage("Warning: Could not remove previous image file " & IMAGE_SOURCE(strImageTag)(IMAGE_SOURCE_LOCAL_PATH))
+		End If
+		ProgressDisable
+		
+		ProgressEnable(VBGT_Get("Moving new image file to permanent location..."))
+			If not Win_MoveFile(strLocalFile, IMAGE_SOURCE(strImageTag)(IMAGE_SOURCE_LOCAL_PATH)) Then
+				MsgBox VBGT_Get("Failed to move new image file to permanent location. The image download failed."), 16, VBGT_Get("Error")
+			End If
+		ProgressDisable
+		
+		ProgressEnable(VBGT_Get("Removing temporary files..."))
+			If not Win_DeleteFolder(strLocalPath) Then
+				LogMessage("Warning: Could not remove temporary folder after successful download, folder: " & strLocalPath)
+			End If
+		ProgressDisable
+		
 		' Now we have successfully downloaded image
 		' Refresh the UI
+		PopulateUpdates
 		PopulateImages
 	End Function
 	
@@ -557,19 +691,20 @@
 	' Checks that current image tag (strCurrentImageTag) points to an existing file name
 	Sub CheckImagePath
 		If (Win_FileExists(IMAGE_SOURCE(strCurrentImageTag)(IMAGE_SOURCE_LOCAL_PATH))) Then
-			objStep1Logo.InnerHTML = "<img src=""marssiva_kukko_harmaa.png"">"
+			MsgBox "FIXME: Image file does not exist"
 		Else
-			objStep1Logo.InnerHTML = "<img src=""marssiva_kukko_vihrea.png"">"
+			MsgBox "FIXME: Image file exists"
 		End If
 	End Sub
 	
-	' Writes strCurrentImageTag image to the selected drives
+	' Writes strCurrentImageTag image to the selected drives (selected with drive group "write")
 	Sub WriteImage
 		Dim boolWriteSuccess, strImageFile, arrSelectedDrives, boolVerifyImage, intReturnCode
 		
 		' Silently exit if strCurrentImageTag has not been set
 		If strCurrentImageTag = "" Then
 			LogMessage "Cowardly refusing to write the image as current image tag is not set"
+			MsgBox VBGT_Get("Please select the image to write"), 16, VBGT_Get("Error")
 			Exit Sub
 		End If
 		
@@ -577,7 +712,7 @@
 		strImageFile = IMAGE_SOURCE(strCurrentImageTag)(IMAGE_SOURCE_LOCAL_PATH)
 		
 		' Get selected drives
-		arrSelectedDrives = GetSelectedDrives()
+		arrSelectedDrives = GetSelectedDrives("write")
 		
 		If (UBound(arrSelectedDrives) = 0) Then
 			MsgBox VBGT_Get("Please select at least one USB memory"), 16, VBGT_Get("Error")
@@ -636,16 +771,36 @@
 		End If
 	End Sub
 	
+	' Removes image (i.e. clears partition table & creates a VFAT partition) for selected
+	' disks (selected with drive group "remove").
+	Sub RemoveImage
+		MsgBox "Not implemented"
+	End Sub
+	
+	' Checks selected drives from both write and remove disk selection groups
+	' and sets their UI status
 	Sub CheckSelectedDrive
 		Dim arrSelectedDrives, objButton
 		
-		arrSelectedDrives = GetSelectedDrives()
+		' Do this for WRITE group
+		arrSelectedDrives = GetSelectedDrives("write")
 		
 		If (UBound(arrSelectedDrives) > 0) Then
-			objStep2Logo.InnerHTML = "<img src=""marssiva_kukko_vihrea.png"">"
+			objPhase3Status.InnerHTML = "Status: There are selected drives"
 		Else
-			objStep2Logo.InnerHTML = "<img src=""marssiva_kukko_harmaa.png"">"
+			objPhase3Status.InnerHTML = "Status: There are no selected drives"
 		End If
+		
+		' Do it again for REMOVE group
+		arrSelectedDrives = GetSelectedDrives("remove")
+		
+		If (UBound(arrSelectedDrives) > 0) Then
+			objPhase5Status.InnerHTML = "Status: There are selected drives"
+		Else
+			objPhase5Status.InnerHTML = "Status: There are no selected drives"
+		End If
+		
+		
 	End Sub
 	
 	Sub SetWriteStatus (intStatus)
@@ -653,16 +808,12 @@
 		' Status < 0 : red logo (failed)
 		' Status > 0 : green logo (success)
 		
-		If intStatus = 0 Then
-			objStep3Logo.InnerHTML = "<img src=""marssiva_kukko_harmaa.png"">"
-		End If
-		
 		If intStatus < 0 Then
-			objStep3Logo.InnerHTML = "<img src=""marssiva_kukko_punainen.png"">"
-		End If
-		
-		If intStatus > 0 Then
-			objStep3Logo.InnerHTML = "<img src=""marssiva_kukko_vihrea.png"">"
+			objPhase4Status.InnerHTML = "Status: Failed"
+		ElseIf intStatus > 0 Then
+			objPhase4Status.InnerHTML = "Status: Success"
+		Else
+			objPhase4Status.InnerHTML = "Status: Neutral"
 		End If
 	End Sub
 	
@@ -700,6 +851,7 @@
 		GetRemoteVersions
 		
 		' Create image selections
+		PopulateUpdates
 		PopulateImages
 		
 		' Select stored image tag
@@ -715,7 +867,14 @@
 	
 	' Magically named Window_onLoad is executed when HTA page is loaded
 	Sub Window_onLoad
-		Dim strLastImageTag
+		Dim strLastImageTag, strLastLanguageName
+		
+		' Get last stored language and set is as current language
+		strLastLanguageName = Win_ReadRegKeyHKCU(REG_HKCU_PATH, REG_LAST_LANGUAGE_KEY)
+		
+		If strLastLanguageName <> "" and LANGUAGES.Exists(strLastLanguageName) Then
+			strCurrentLanguageName = strLastLanguageName
+		End If
 		
 		' Set language options (and write langage-specific fields to UI)
 		PopulateLanguages
@@ -729,10 +888,8 @@
 		' Get last stored image tag and set is as current image
 		strLastImageTag = Win_ReadLastImageTag()
 		
-		If strLastImageTag <> "" Then
-			If IMAGE_SOURCE(strLastImageTag)(IMAGE_SOURCE_LEGEND) <> "" Then
-				strCurrentImageTag = Win_ReadLastImageTag()
-			End If
+		If strLastImageTag <> "" and IMAGE_SOURCE.Exists(strLastImageTag) Then
+			strCurrentImageTag = strLastImageTag
 		End If
 		
 		' Set write status to neutral
@@ -753,36 +910,68 @@
 
 <body onBeforeUnload="Window_OnExit">
 <span id="objLanguageSelectionLayer" class="languageSelectionLayer"></span>
-<table>
-<tr><td colspan="2"><h1><span id="objPhase1Heading"></span></h1></td></tr>
-<tr>
-	<td id="objStep1Logo" class="cellIcon"></td>
-	<td class="cellText">
+
+<!-- Phase 1: Check for updates -->
+
+<h1><span id="objPhase1Heading"></span></h1>
+
+<span class="cellText">
+	<span id="objImageUpdateTable"></span>
+</span>
+
+<span id="objImageGroupUpdate"></span>
+
+<span id="objPhase1Status"></span>
+
+<!-- Phase 2: Select image -->
+
+<h1><span id="objPhase2Heading"></span></h1>
+
+<span class="cellText">
 		<span id="objImageSelectionTable"></span>
-	</td>
-</tr>
+</span>
 
-<tr><td colspan="2"><h1><span id="objPhase2Heading"></span></h1></td></tr>
-<tr>
-	<td id="objStep2Logo" class="cellIcon"></td>
-	<td class="cellText">
+<span id="objPhase2Status"></span>
+
+<!-- Phase 3: Select USB media -->
+
+<h1><span id="objPhase3Heading"></span></h1>
+
+<span class="cellText">
 	<span class="radio_disk_normal">
-		<span id="objRadioButtonArea"></span>
+		<span id="objWriteRadioButtonArea"></span>
 	</span>
-	</td>
-</tr>
+</span>
 
-<tr><td colspan="2"><h1><span id="objPhase3Heading"></span></h1></td></tr>
-<tr>
-	<td id="objStep3Logo" class="cellIcon"></td>
-	<td class="cellText">
-	<p><input type="checkbox" id="checkboxVerify" name="checkboxVerify" checked><span id="objPhase3Verify"></span></p>
+<span id="objPhase3Status"></span>
+
+<!-- Phase 4: Start write -->
+
+<h1><span id="objPhase4Heading"></span></h1>
+
+<span class="cellText">
+	<p><input type="checkbox" id="checkboxVerify" name="checkboxVerify" checked><span id="objPhase4Verify"></span></p>
 	<input type="button" id="buttonWriteImage" value="Write" onclick="WriteImage()">
 	<br/><br/>
 	<span id="objWriteStatus"></span>
-	</td>
-</tr>
-</table>
+</span>
+
+<span id="objPhase4Status"></span>
+
+<!-- Phase 5: Clean selected USB memories -->
+
+<h1><span id="objPhase5Heading"></span></h1>
+
+<span class="cellText">
+	<span class="radio_disk_normal">
+		<span id="objRemoveRadioButtonArea"></span>
+	</span>
+	<input type="button" id="buttonRemoveImage" value="Remove" onclick="RemoveImage()">
+	<br/><br/>
+	<span id="objPhase5Status"></span>
+</span>
+
+
 
 <div id="objProgressLayer" class="progressLayer" style="visibility: hidden">
 	<img style="margin: 10px" src="working.gif"/><br/>

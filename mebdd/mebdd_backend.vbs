@@ -18,6 +18,8 @@
 '    like downloading files, counting MD5 digests and calling mebdd_worker
 '    to write images. This script is included by mebdd.hta.
 
+Option Explicit
+
 ' This global variable contains sting of last reported error
 Dim BEnd_LastError
 
@@ -187,7 +189,7 @@ Function BEnd_DownloadMD5AndStore (strURL, strKeyPath, strKeyName)
 End Function
 
 Function BEnd_WriteImage (strImageFile, arrSelectedDrives, boolVerifyImage)
-	Dim strWorkerCmd, exitcode
+	Dim strWorkerCmd, exitcode, n, objShell
 	
 	BEnd_LastError = ""
 
@@ -196,14 +198,6 @@ Function BEnd_WriteImage (strImageFile, arrSelectedDrives, boolVerifyImage)
 	Set fso = CreateObject("Scripting.FileSystemObject")
 	If (Not fso.FileExists(strImageFile)) Then
 		BEnd_LastError = "IMAGE_FILE_NOT_FOUND"
-		BEnd_WriteImage = False
-		Exit Function
-	End If
-	
-	arrSelectedDrives = GetSelectedDrives()
-	
-	If (UBound(arrSelectedDrives) = 0) Then
-		BEnd_LastError = "NO_DRIVES_SELECTED"
 		BEnd_WriteImage = False
 		Exit Function
 	End If
@@ -220,12 +214,11 @@ Function BEnd_WriteImage (strImageFile, arrSelectedDrives, boolVerifyImage)
 		strWorkerCmd = strWorkerCmd & " " & Chr(34) & arrSelectedDrives(n) & Chr(34)
 	Next
 	
-	Dim shell
-	Set shell = CreateObject("WScript.Shell")
+	Set objShell = CreateObject("WScript.Shell")
 	
 	BEnd_LogMessage "calling mebdd_worker: " & strWorkerCmd
 
-	exitcode = shell.Run(strWorkerCmd, 7, TRUE)
+	exitcode = objShell.Run(strWorkerCmd, 7, TRUE)
 
 	BEnd_LogMessage "mebdd_worker returns: " & exitcode
 	
@@ -253,7 +246,7 @@ End Function
 ' Unbox using Info-ZIP
 ' Returns true on success
 Function BEnd_UnboxZip (strPathBox, strPathLocal)
-	Dim strLocalPath, strLocalBasename, strUnzipCmd, exitcode
+	Dim strLocalPath, strLocalBasename, strLocalPathname, strUnzipCmd, exitcode
 	
 	strLocalBasename = Win_GetBaseName(strPathLocal)
 	strLocalPathname = Win_GetPathName(strPathLocal)
@@ -373,5 +366,5 @@ Function BEnd_FMT( str, args )
 		end if
 	next
 
-	fmt = res
+	BEnd_FMT = res
 End Function
