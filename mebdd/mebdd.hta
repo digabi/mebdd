@@ -300,6 +300,9 @@
 		strTable = strTable & "</table>"
 
 		objImageSelectionTable.InnerHTML = strTable
+		
+		' Make sure that selected image is selectable
+		CheckImagePath
 	End Sub
 	
 	Sub PopulateDrives
@@ -686,14 +689,23 @@
 				objRow.className = "imageTableNormal"
 			End If
 		Next
+		
+		' Update image selection status
+		CheckImagePath
 	End Sub
 	
 	' Checks that current image tag (strCurrentImageTag) points to an existing file name
 	Sub CheckImagePath
-		If (Win_FileExists(IMAGE_SOURCE(strCurrentImageTag)(IMAGE_SOURCE_LOCAL_PATH))) Then
-			MsgBox "FIXME: Image file does not exist"
+		If IMAGE_SOURCE.Exists(strCurrentImageTag) Then
+			If (Win_FileExists(IMAGE_SOURCE(strCurrentImageTag)(IMAGE_SOURCE_LOCAL_PATH))) Then
+				objPhase2Status.InnerHTML = "<p>Status: There is a selected image.</p>"
+			Else
+				objPhase2Status.InnerHTML = "<p>Status: There is no selected image.</p>"
+				strCurrentImageTag = ""
+			End If
 		Else
-			MsgBox "FIXME: Image file exists"
+			' strCurrentImageTag does not exist in the IMAGE_SOURCE hash
+			strCurrentImageTag = ""
 		End If
 	End Sub
 	
