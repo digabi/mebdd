@@ -189,7 +189,7 @@ Function BEnd_DownloadMD5AndStore (strURL, strKeyPath, strKeyName)
 End Function
 
 Function BEnd_WriteImage (strImageFile, arrSelectedDrives, boolVerifyImage)
-	Dim strWorkerCmd, exitcode, n, objShell
+	Dim strWorkerCmd, exitcode, errorcode, n, objShell
 	
 	BEnd_LastError = ""
 
@@ -204,10 +204,10 @@ Function BEnd_WriteImage (strImageFile, arrSelectedDrives, boolVerifyImage)
 	
 	If boolVerifyImage Then
 		' Execute mebdd_worker with verify
-		strWorkerCmd = Chr(34) & BIN_MEBDD_WORKER & Chr(34) & " -v " & Chr(34) & strImageFile & Chr(34)
+		strWorkerCmd = Chr(34) & BIN_MEBDD_WORKER & Chr(34) & " -w -v " & Chr(34) & strImageFile & Chr(34)
 	Else
 		' No verify this time
-		strWorkerCmd = Chr(34) & BIN_MEBDD_WORKER & Chr(34) & " " & Chr(34) & strImageFile & Chr(34)
+		strWorkerCmd = Chr(34) & BIN_MEBDD_WORKER & Chr(34) & " -w " & Chr(34) & strImageFile & Chr(34)
 	End If
 	
 	For n = 1 to UBound(arrSelectedDrives)
@@ -218,7 +218,17 @@ Function BEnd_WriteImage (strImageFile, arrSelectedDrives, boolVerifyImage)
 	
 	BEnd_LogMessage "calling mebdd_worker: " & strWorkerCmd
 
+	On Error Resume Next
 	exitcode = objShell.Run(strWorkerCmd, 7, TRUE)
+	errorcode = Err.Number
+	On Error Goto 0
+	
+	If errorcode <> 0 Then
+		BEnd_LogMessage "mebdd_worker shell object returns error code: " & errorcode
+		BEnd_LastError = ""
+		BEnd_WriteImage = False
+		Exit Function
+	End If
 
 	BEnd_LogMessage "mebdd_worker returns: " & exitcode
 	
@@ -228,6 +238,44 @@ Function BEnd_WriteImage (strImageFile, arrSelectedDrives, boolVerifyImage)
 	Else
 		BEnd_LastError = exitcode
 		BEnd_WriteImage = False
+	End If
+End Function
+
+Function BEnd_CreateFilesystem (arrSelectedDrives)
+	Dim strWorkerCmd, exitcode, errorcode, n, objShell
+	
+	BEnd_LastError = ""
+
+	strWorkerCmd = Chr(34) & BIN_MEBDD_WORKER & Chr(34) & " -c"
+	
+	For n = 1 to UBound(arrSelectedDrives)
+		strWorkerCmd = strWorkerCmd & " " & Chr(34) & arrSelectedDrives(n) & Chr(34)
+	Next
+	
+	Set objShell = CreateObject("WScript.Shell")
+	
+	BEnd_LogMessage "calling mebdd_worker: " & strWorkerCmd
+
+	On Error Resume Next 
+	exitcode = objShell.Run(strWorkerCmd, 7, TRUE)
+	errorcode = Err.Number
+	On Error Goto 0
+	
+	If errorcode <> 0 Then
+		BEnd_LogMessage "mebdd_worker shell object returns error code: " & errorcode
+		BEnd_LastError = ""
+		BEnd_CreateFileSystem = False
+		Exit Function
+	End If
+
+	BEnd_LogMessage "mebdd_worker returns: " & exitcode
+	
+	If (exitcode = 255) Then
+		BEnd_LastError = ""
+		BEnd_CreateFilesystem = True
+	Else
+		BEnd_LastError = exitcode
+		BEnd_CreateFilesystem = False
 	End If
 End Function
 

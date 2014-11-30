@@ -748,15 +748,11 @@
 			boolVerifyImage = False
 		End If
 		
-		If strCurrentImageTag = "local_zero" Then
-			ProgressEnable(VBGT_Get("Now resetting USB memories..."))
-		Else
-			' Store last image path
-			If not Win_WriteLastImageTag(strCurrentImageTag) Then
-				LogMessage("Could not store last selected image: " & Win_LastError)
-			End If
-			ProgressEnable(VBGT_Get("Writing USB memories..."))
+		' Store last image path
+		If not Win_WriteLastImageTag(strCurrentImageTag) Then
+			LogMessage("Could not store last selected image: " & Win_LastError)
 		End If
+		ProgressEnable(VBGT_Get("Writing USB memories..."))
 
 		boolWriteSuccess = BEnd_WriteImage(strImageFile, arrSelectedDrives, boolVerifyImage)
 		
@@ -788,7 +784,38 @@
 	' Removes image (i.e. clears partition table & creates a VFAT partition) for selected
 	' disks (selected with drive group "remove").
 	Sub RemoveImage
-		MsgBox "Not implemented"
+		Dim boolWriteSuccess, strImageFile, arrSelectedDrives, boolVerifyImage, intReturnCode
+		
+		' Get selected drives
+		arrSelectedDrives = GetSelectedDrives("remove")
+		
+		If (UBound(arrSelectedDrives) = 0) Then
+			MsgBox VBGT_Get("Please select at least one USB memory"), 16, VBGT_Get("Error")
+			Exit Sub
+		End If
+
+		intReturnCode = MsgBox(VBGT_Get("Warning! This operation removes all files from the selected USB memories. Are you sure you want to continue?"), 1+32+256, VBGT_Get("Confirm"))
+		
+		If intReturnCode <> 1 Then
+			MsgBox VBGT_Get("Operation cancelled"), 64, VBGT_Get("Cancelled")
+			Exit Sub
+		End If
+		
+		ProgressEnable(VBGT_Get("Resetting selected USB memories..."))
+
+		boolWriteSuccess = BEnd_CreateFilesystem(arrSelectedDrives)
+		
+		ProgressDisable
+		
+		If boolWriteSuccess Then
+			' Write succeeded
+			SetWriteStatus(1)
+			MsgBox VBGT_Get("The selected USB memories have been reset."), 64
+		Else
+			' Write Failed
+			SetWriteStatus(-1)
+			MsgBox VBGT_Get("Failed to reset USB memories."), 16, VBGT_Get("Error")
+		End If
 	End Sub
 	
 	' Checks selected drives from both write and remove disk selection groups

@@ -8,6 +8,7 @@ unit mebdd_worker_reg;
 
 interface
 
+function read_registry_hklm_value_int (key_path:AnsiString; key_name:AnsiString):Integer;
 function read_registry_hklm_value_str (key_path:AnsiString; key_name:AnsiString):AnsiString;
 function read_registry_hkcu_value_int (key_path:AnsiString; key_name:AnsiString):Integer;
 function read_registry_hkcu_value_string (key_path:AnsiString; key_name:AnsiString):AnsiString;
@@ -54,6 +55,35 @@ begin
 {$endif}
 end;
 
+function read_registry_hklm_value_int (key_path:AnsiString; key_name:AnsiString):Integer;
+
+var
+	key_value: Integer;
+	registry: TRegistry;
+	
+begin
+	if is_windows_64() then
+		registry := TRegistry.Create(KEY_READ)
+	else
+		registry := TRegistry.Create(KEY_READ OR KEY_WOW64_32KEY);
+		
+	{$I-}
+	try
+		registry.RootKey := HKEY_LOCAL_MACHINE;
+		
+		if registry.OpenKeyReadOnly(key_path) then
+			key_value := registry.ReadInteger(key_name);
+	except
+		On ERegistryException do
+			key_value := -1;
+	end;
+	{$I+}
+
+	registry.Free;
+	
+	read_registry_hklm_value_int := key_value;
+end;
+
 function read_registry_hklm_value_str (key_path:AnsiString; key_name:AnsiString):AnsiString;
 
 var
@@ -76,6 +106,7 @@ begin
 		On ERegistryException do
 			key_value := '';
 	end;
+	{$I+}
 
 	registry.Free;
 	
@@ -104,6 +135,7 @@ begin
 		On ERegistryException do
 			key_value := -1;
 	end;
+	{$I+}
 	
 	registry.Free;
 	
@@ -132,6 +164,7 @@ begin
 		On ERegistryException do
 			key_value := '';
 	end;
+	{$I+}
 	
 	registry.Free;
 	
