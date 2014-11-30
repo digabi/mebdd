@@ -272,7 +272,7 @@ Function BEnd_UnboxZip (strPathBox, strPathLocal)
 	
 	BEnd_LogMessage "calling unzip: " & strUnzipCmd
 
-	exitcode = objShell.Run(strUnzipCmd, 0, TRUE)
+	exitcode = objShell.Run(strUnzipCmd, 7, TRUE)
 
 	BEnd_LogMessage "unzip returns: " & exitcode
 	
