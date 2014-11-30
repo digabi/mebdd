@@ -575,7 +575,7 @@
 							MsgBox VBGT_Get("Failed to unpack the image data. Please download the image data again"), 16, VBGT_Get("Error")
 							
 							' Delete temporary folder
-							If Win_FolderExists(strLocalPath) and not Win_DeleteFolder(strLocalPath) Then
+							If not Win_DeleteFolder(strLocalPath) Then
 								LogMessage("Warning: Could not remove temporary folder " & strLocalPath)
 							End If
 							
@@ -599,8 +599,8 @@
 					LogMessage("Image verify failed, error: " & BEnd_LastError)
 					MsgBox VBGT_Get("There are errors in the downloaded image data. Please download the image data again."), 16, VBGT_Get("Error")
 					' Delete failed temporary path
-					If not Win_DeleteFolder(Win_GetPathName(strLocalFile)) Then
-						LogMessage("Warning: Could not remove temporary folder " & Win_GetPathName(strLocalFile))
+					If not Win_DeleteFolder(strLocalPath) Then
+						LogMessage("Warning: Could not remove temporary folder " & strLocalPath)
 					End If
 					
 					ProgressDisable
@@ -619,8 +619,10 @@
 			AppendWriteStatus(VBGT_Get("The image data download failed."))
 			MsgBox VBGT_Get("The image data download failed."), 16, VBGT_Get("Error")
 
-			' Delete failed file & hash
-			boolResult = Win_DeleteFile(IMAGE_SOURCE(strImageTag)(IMAGE_SOURCE_LOCAL_PATH))
+			' Delete failed temporary path & hash
+			If Win_FolderExists(strLocalPath) and not Win_DeleteFolder(strLocalPath) Then
+				LogMessage("Warning: Could not remove temporary folder " & strLocalPath)
+			End If
 			boolResult = Win_WriteRegKeyHKCU(IMAGE_SOURCE(strImageTag)(IMAGE_SOURCE_MD5_REG_PATH), IMAGE_SOURCE(strImageTag)(IMAGE_SOURCE_MD5_LOCAL_REG_KEY), "")
 
 			Download = False
