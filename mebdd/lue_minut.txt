@@ -39,6 +39,23 @@ mebdd_read käyttää MD5-kirjastoa md5customised:
 Muutokset
 ---------
 
+1.3g (5.12.2014)
+- korjattu virhe: URL:t kehityspalvelimelta
+- debug-loki näkyy näytöllä
+
+1.3f (4.12.2014)
+- lataus taas cURLilla, mutta nyt katkennut lataus jatkuu
+
+1.3e (3.12.2014)
+- lataus paloissa ilman cURLia, toimii paremmin heikolla verkolla
+- lataus tuntuu hitaalta ja prosessissa on vielä optimoimista, mutta tuntuu toimivan
+- USB-muistin pyyhkiminen luo FAT-tiedostojärjestelmän DISKPARTin avulla
+
+1.3d (28.11.2014)
+- uusi käyttöliittymä (rautalankamalli)
+- imageiden lataus pareittain (samalla latauspainikkeella sekä KTP että KOE)
+- kielivalinta (käännöksiä ei ole vielä tehty)
+
 1.3c (12.11.2014)
 - muutettu näytettävien usb-muistien tyyppiä saatujen raporttien perusteella
 - päivitystiedostoina käytetään julkisia URLeja testiverkon sijaan

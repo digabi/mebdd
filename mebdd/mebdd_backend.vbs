@@ -81,20 +81,32 @@ Function BEnd_FileMD5IsEqual(strFilePath, strMD5)
 End Function
 
 Function BEnd_DownloadImage (strURL, strDestinationFile)
-	Dim strCurlCmd, exitcode, boolResult
+	Dim strCurlCmd, exitcode, boolResult, boolRetry
 	
 	boolResult = False
 	BEnd_LastError = ""
 	
-	strCurlCmd = Chr(34) & BIN_CURL & Chr(34) & " -L -k """ & strURL & """ -o """ & strDestinationFile & Chr(34)
+	strCurlCmd = Chr(34) & BIN_CURL & Chr(34) & " -L -k --speed-time 5 --speed-limit 256 -C - """ & strURL & """ -o """ & strDestinationFile & Chr(34)
 	
 	Dim shell
 	Set shell = CreateObject("WScript.Shell")
-	BEnd_LogMessage "calling cURL: " & strCurlCmd
 	
-	exitcode = shell.Run(strCurlCmd, 7, TRUE)
-	
-	BEnd_LogMessage "cURL returns: " & exitcode 
+	boolRetry = True
+	While boolRetry
+		BEnd_LogMessage "calling cURL: " & strCurlCmd
+		
+		exitcode = shell.Run(strCurlCmd, 7, TRUE)
+		
+		BEnd_LogMessage "cURL returns: " & exitcode 
+		If exitcode = 56 Or exitcode = 28 Then
+			' Timeout, retry...
+			boolRetry = True
+			BEnd_LogMessage "Got timeout (#" & exitcode & "), retrying"
+		Else
+			' Other error, fail...
+			boolRetry = False
+		End If
+	Wend
 	
 	If (exitcode = 0) Then
 		boolResult = True

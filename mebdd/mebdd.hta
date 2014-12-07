@@ -18,7 +18,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 	
 -->
-<title>MEB DD 1.3d</title>
+<title>MEB DD 1.3g</title>
 <HTA:APPLICATION 
      APPLICATIONNAME="MEB DD"
      SCROLL="yes"
@@ -118,17 +118,17 @@
 		IMAGE_SOURCE.RemoveAll()
 		
 		' KTP & KOE
-		'IMAGE_SOURCE.Add "ktp", Array(_
-		'	VBGT_Get("Digabi exam server"),_
-		'	VBGT_Get("Digabi exam server (KTP)"),_
-		'	"http://kurko.digabi.fi/latest/ktp.zip", "http://kurko.digabi.fi/latest/ktp.zip.md5", Win_GetLocalImageDirectoryPath() & "ktp.dd",_
-		'	REG_HKCU_PATH,"MD5_digabiktp_remote", "MD5_digabiktp_local")
+		IMAGE_SOURCE.Add "ktp", Array(_
+			VBGT_Get("Digabi exam server"),_
+			VBGT_Get("Digabi exam server (KTP)"),_
+			"http://kurko.digabi.fi/latest/ktp.zip", "http://kurko.digabi.fi/latest/ktp.zip.md5", Win_GetLocalImageDirectoryPath() & "ktp.dd",_
+			REG_HKCU_PATH,"MD5_digabiktp_remote", "MD5_digabiktp_local")
 			
-		'IMAGE_SOURCE.Add "koe", Array(_
-		'	VBGT_Get("Digabi exam device"),_
-		'	VBGT_Get("Digabi exam device (KOE)"),_
-		'	"http://kurko.digabi.fi/latest/koe.zip", "http://kurko.digabi.fi/latest/koe.zip.md5", Win_GetLocalImageDirectoryPath() & "koe.dd",_
-		'	REG_HKCU_PATH, "MD5_digabikoe_remote", "MD5_digabikoe_local")
+		IMAGE_SOURCE.Add "koe", Array(_
+			VBGT_Get("Digabi exam device"),_
+			VBGT_Get("Digabi exam device (KOE)"),_
+			"http://kurko.digabi.fi/latest/koe.zip", "http://kurko.digabi.fi/latest/koe.zip.md5", Win_GetLocalImageDirectoryPath() & "koe.dd",_
+			REG_HKCU_PATH, "MD5_digabikoe_remote", "MD5_digabikoe_local")
 		
 		' DigabiOS demo
 		'IMAGE_SOURCE.Add "digabi64", Array(_
@@ -144,12 +144,12 @@
 		'	REG_HKCU_PATH, "MD5_digabi32_remote", "MD5_digabi32_local")
 
 		' Local tests
-		IMAGE_SOURCE.Add "ktplocal", Array("Digabi KTP", "Digabin koetilan palvelin (KTP), paikallinen", "http://127.0.0.1:8080/ktp.zip", "http://127.0.0.1:8080/ktp.zip.md5", Win_GetLocalImageDirectoryPath() & "ktp.dd", REG_HKCU_PATH, "MD5_ktplocal_remote", "MD5_ktplocal_local")
-		IMAGE_SOURCE.Add "koelocal", Array("Digabi KOE", "Digabin kokelaan päätelaite (KOE), paikallinen", "http://127.0.0.1:8080/koe.zip", "http://127.0.0.1:8080/koe.zip.md5", Win_GetLocalImageDirectoryPath() & "koe.dd", REG_HKCU_PATH, "MD5_koelocal_remote", "MD5_koelocal_local")
+		'IMAGE_SOURCE.Add "ktplocal", Array("Digabi KTP", "Digabin koetilan palvelin (KTP), paikallinen", "http://127.0.0.1:8080/ktp.zip", "http://127.0.0.1:8080/ktp.zip.md5", Win_GetLocalImageDirectoryPath() & "ktp.dd", REG_HKCU_PATH, "MD5_ktplocal_remote", "MD5_ktplocal_local")
+		'IMAGE_SOURCE.Add "koelocal", Array("Digabi KOE", "Digabin kokelaan päätelaite (KOE), paikallinen", "http://127.0.0.1:8080/koe.zip", "http://127.0.0.1:8080/koe.zip.md5", Win_GetLocalImageDirectoryPath() & "koe.dd", REG_HKCU_PATH, "MD5_koelocal_remote", "MD5_koelocal_local")
+		'IMAGE_SOURCE.Add "ktplocal", Array("Digabi KTP", "Digabin koetilan palvelin (KTP), paikallinen", "http://192.168.0.1/meb/ktp.zip", "http://192.168.0.1/meb/ktp.zip.md5", Win_GetLocalImageDirectoryPath() & "ktp.dd", REG_HKCU_PATH, "MD5_ktplocal_remote", "MD5_ktplocal_local")
+		'IMAGE_SOURCE.Add "koelocal", Array("Digabi KOE", "Digabin kokelaan päätelaite (KOE), paikallinen", "http://192.168.0.1/meb/koe.zip", "http://192.168.0.1/meb/koe.zip.md5", Win_GetLocalImageDirectoryPath() & "koe.dd", REG_HKCU_PATH, "MD5_koelocal_remote", "MD5_koelocal_local")
 
 		' Do not change these
-		'IMAGE_SOURCE.Add "local_zero", Array(VBGT_Get("Reset"),VBGT_Get("Select this to reset USB memories"), "", "", Win_GetMEBDDInstallationPath() & "\zero_image.iso", "", "", "")
-
 		'IMAGE_SOURCE.Add "local_image", Array(VBGT_Get("Local file (.iso, .dd)"),"<input type=""button"" id=""buttonOpenFile"" value=""" & VBGT_Get("Select file") & """ onClick=""AskImageFilePath()"">", "", "", "", "", "", "")
 
 	End Sub
@@ -761,12 +761,7 @@
 		If boolWriteSuccess Then
 			' Write succeeded
 			SetWriteStatus(1)
-			If strCurrentImageTag = "local_zero" Then
-				AppendWriteStatus(VBGT_Get("Resetting USB memories has finished successfully."))
-				MsgBox VBGT_Get("The USB memories have been reset. Please remove the USB memories and insert them again. Accept the suggestion of formatting the inserted memories."), 64
-			Else
-				AppendWriteStatus(VBGT_Get("The USB memories have been written successfully"))
-			End If
+			MsgBox VBGT_Get("The USB memories have been written successfully"), 64
 		Else
 			' Write Failed
 			SetWriteStatus(-1)
@@ -776,7 +771,7 @@
 			ElseIf BEnd_LastError = "NO_DRIVES_SELECTED" Then
 				MsgBox VBGT_Get("Please select at least one USB memory"), 16, VBGT_Get("Error")
 			Else
-				AppendWriteStatus(BEnd_FMT(VBGT_Get("USB memory write failed. Error code: %x <a href='%x'>Open Log File</a>"), Array(BEnd_LastError, "file://" & Win_GetEnvironmentString("TEMP") & "\mebdd.txt")))
+				MsgBox VBGT_Get("USB memory write failed."), 16, VBGT_Get("Error")
 			End If
 		End If
 	End Sub
@@ -840,8 +835,6 @@
 		Else
 			objPhase5Status.InnerHTML = "Status: There are no selected drives"
 		End If
-		
-		
 	End Sub
 	
 	Sub SetWriteStatus (intStatus)
@@ -993,8 +986,6 @@
 <span class="cellText">
 	<p><input type="checkbox" id="checkboxVerify" name="checkboxVerify" checked><span id="objPhase4Verify"></span></p>
 	<input type="button" id="buttonWriteImage" value="Write" onclick="WriteImage()">
-	<br/><br/>
-	<span id="objWriteStatus"></span>
 </span>
 
 <span id="objPhase4Status"></span>
@@ -1012,7 +1003,8 @@
 	<span id="objPhase5Status"></span>
 </span>
 
-
+<h1>Status / Debug</h1>
+<span id="objWriteStatus"></span>
 
 <div id="objProgressLayer" class="progressLayer" style="visibility: hidden">
 	<img style="margin: 10px" src="working.gif"/><br/>
