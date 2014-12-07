@@ -17,6 +17,8 @@
 '    This file contains all subs and functions related to Windows OS.
 '    This script is included by mebdd.hta.
 
+Option Explicit
+
 Const HKEY_CURRENT_USER =  &H80000001
 Const HKEY_LOCAL_MACHINE = &H80000002
 Const KEY_QUERY_VALUE = &H0001
@@ -350,4 +352,72 @@ Function Win_MoveFile (strSourcePath, strDestinationPath)
 	Else
 		Win_MoveFile = False
 	End If
+End Function
+
+' Recursively kills all subprocesses of the current process
+' Returns True if all subprocesses were killed successfully
+Function Win_KillMySubprocesses
+	Dim PID
+	PID = Win_GetCurrentProcessId
+	Win_KillMySubprocesses = Win_KillProcesses(PID, False)
+End Function
+
+' Recursively kills all subprocesses of the given process (intPID)
+' If boolKillParent is true kills the intPID as well
+' Returns True if all subprocesses were killed successfully
+' http://stackoverflow.com/questions/20379723/how-to-kill-child-processes-with-vbscript
+Function Win_KillProcesses (intPID, boolKillParent)
+	Dim PID, intResult, boolResult
+	Dim objWMIService, colProcessList, objProcess
+		
+	PID = Win_GetCurrentProcessId
+	Win_LastError = ""
+
+	' Check for subprocesses kill them first
+	Set objWMIService = GetObject("winmgmts:" & "{impersonationLevel=impersonate}!\\.\root\cimv2")
+	Set colProcessList = objWMIService.ExecQuery("SELECT * FROM Win32_Process WHERE ParentProcessId = " & intPID)
+	boolResult = True
+	For Each objProcess in colProcessList 
+		' Call myself with subprocess PID
+		If not Win_KillProcesses(objProcess.ProcessId, True) Then
+			' Send error downstream
+			boolResult = False
+		End If
+	Next
+	
+	' Kill the given process
+	If boolKillParent Then
+		Set colProcessList = objWMIService.ExecQuery("SELECT * FROM Win32_Process WHERE ProcessId = " & intPID)
+		For Each objProcess in colProcessList 
+			intResult = objProcess.Terminate
+			If intResult <> 0 Then
+				Win_LastError = "KILL_FAILED"
+				boolResult = False
+			End If
+		Next
+	End If
+	
+	Win_KillProcesses = boolResult
+End Function
+
+' Get PID of the current subprocess
+' http://stackoverflow.com/questions/20379723/how-to-kill-child-processes-with-vbscript
+Function Win_GetCurrentProcessId
+	Dim oShell, sCmd, oWMI, oChldPrcs, oCols, lOut, lResult
+	lOut = 0
+	Set oShell  = CreateObject("WScript.Shell")
+	Set oWMI    = GetObject("winmgmts:{impersonationLevel=impersonate}!\\.\root\cimv2")
+	sCmd = "/K @echo " & Int(Rnd * 3333) * CDbl(Timer) \ 1
+	oShell.Run "%comspec% " & sCmd, 0
+	BEnd_Wait(100)
+	Set oChldPrcs = oWMI.ExecQuery("Select * From Win32_Process Where CommandLine Like '%" & sCmd & "'", ,32)
+	For Each oCols In oChldPrcs
+		lOut = oCols.ParentProcessId
+		lResult = oCols.Terminate
+		Exit For
+	Next
+	Set oChldPrcs = Nothing
+	Set oWMI = Nothing
+	Set oShell = Nothing
+	Win_GetCurrentProcessId = lOut
 End Function

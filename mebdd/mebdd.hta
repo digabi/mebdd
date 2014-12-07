@@ -23,6 +23,7 @@
      APPLICATIONNAME="MEB DD"
      SCROLL="yes"
      SINGLEINSTANCE="yes"
+	 SYSMENU="no"
      WINDOWSTATE="maximize"
 	 ICON="digabi_kuukkeli.ico"
 >
@@ -42,6 +43,7 @@
 		.updateTableNormal { font-family: Arial; font-size: 12pt; background-color: white; }
 		
 		.progressLayer { position: absolute; width: 200px; height: 200px; z-index: 2; left: 200px; top: 200px; margin-left: auto; margin-right: auto; background-color: #ffffff; border-style: solid; border-color: black; font-family: Arial; padding: 20px; }
+		.closeButtonLayer { float: right; font-family: Arial; color: red; }
 		.languageSelectionLayer { float: right; font-family: Arial; color: red; }
 	</style>
 </head>
@@ -422,6 +424,7 @@
 		SetImageSources
 
 		' Write language-specific fields to UI
+		buttonWindowClose.Value = VBGT_Get("Close")
 		objPhase1Heading.InnerHTML = VBGT_Get("Phase 1: Update image files")
 		objPhase2Heading.InnerHTML = VBGT_Get("Phase 2: Select image to write")
 		objPhase3Heading.InnerHTML = VBGT_Get("Phase 3: Select USB memories")
@@ -958,19 +961,29 @@
 		SetWriteStatus(0)
 	End Sub
 
-	' This is executed whenever user exits the script.
-	Sub Window_OnExit
+	' This is executed whenever user clicks the close button on the page
+	' The close button of the window is not hidden
+	Sub Window_Close
+		LogMessage "Killing all subprocesses"
+		
+		' Kill subprocesses
+		If not Win_KillMySubprocesses() Then
+			LogMessage "Failed to kill subprocesses: " & Win_LastError
+		End If
+		
 		' Clear timer intervals
 		window.clearInterval(objTimerOnload)
 		window.clearInterval(objTimerScandisks)
+		
 		' Log exit
 		LogMessage "Exiting by user"
-		
+		window.close()
 	End Sub
 	
 </script>
 
-<body onBeforeUnload="Window_OnExit">
+<body>
+<span id="objCloseButtonLayer" class="closeButtonLayer"><input type="button" id="buttonWindowClose" value="Close" onclick="Window_Close()"></span>
 <span id="objLanguageSelectionLayer" class="languageSelectionLayer"></span>
 
 <!-- Phase 1: Check for updates -->

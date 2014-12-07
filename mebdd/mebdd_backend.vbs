@@ -428,3 +428,14 @@ Function BEnd_FMT( str, args )
 
 	BEnd_FMT = res
 End Function
+
+' Wait for Time milliseconds
+' http://stackoverflow.com/questions/16865430/sleep-routine-for-hta-scripts
+Sub BEnd_Wait(Time)
+	Dim wmiQuery, objWMIService, objPing, objStatus
+	wmiQuery = "Select * From Win32_PingStatus Where Address = '1.1.1.1' AND Timeout = " & Time
+	Set objWMIService = GetObject("winmgmts:\\.\root\cimv2")
+	Set objPing = objWMIService.ExecQuery(wmiQuery)
+	For Each objStatus in objPing
+	Next
+End Sub
