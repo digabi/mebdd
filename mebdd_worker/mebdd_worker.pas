@@ -94,7 +94,7 @@ begin
 	_result := '';
 	
 	RegexObj := TRegExpr.Create;
-	RegexObj.Expression := '^\\\\\.\\PHYSICALDRIVE(\d)$';
+	RegexObj.Expression := '^\\\\\.\\PHYSICALDRIVE(\d+)$';
 	RegexObj.ModifierI := True;
 	if RegexObj.Exec(devicepath) then
 		begin
