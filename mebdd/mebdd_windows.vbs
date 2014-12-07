@@ -232,7 +232,7 @@ Function Win_GetTempFilename ()
 	Set objFSO = CreateObject("Scripting.FileSystemObject")
 	Const intTemporaryFolder = 2
 	
-	Win_GetTempFilename = objFSO.GetSpecialFolder(intTemporaryFolder) & "\" & objFSO.GetTempName
+	Win_GetTempFilename = objFSO.GetSpecialFolder(intTemporaryFolder) & "\mebdd_" & objFSO.GetTempName
 End Function
 
 
