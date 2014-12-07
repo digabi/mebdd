@@ -53,6 +53,80 @@ Sub BEnd_LogMessage (strMessage)
 	End If
 End Sub
 
+' Enumerate all image sources
+' Returns a hash array ("Scripting.Dictionary" object)
+Function BEnd_GetImageSources (strIniFile)
+	Dim objReturn, objIni, strSection, strKey
+	Set objReturn = CreateObject("Scripting.Dictionary")
+	Set objIni = BEnd_ReadIniFile(strIniFile)
+	objReturn.RemoveAll()
+	
+	If objIni Is Nothing Then
+		' Failed to load ini file
+		' Return empty
+		BEnd_LogMessage "Failed to load image .ini file: " & strIniFile
+	Else
+		' We have content
+		' Loop through all sections
+		For Each strSection in objIni.Keys()
+			' REG_HKCU_PATH is a global variable
+			objReturn.Add strSection, Array(_
+				objIni(strSection)("Legend"),_
+				objIni(strSection)("Description"),_
+				objIni(strSection)("URLimage"),_
+				objIni(strSection)("URLMD5"),_
+				Win_GetLocalImageDirectoryPath() & objIni(strSection)("LocalFile"),_
+				REG_HKCU_PATH,_
+				objIni(strSection)("RegRemoteMD5"),_
+				objIni(strSection)("RegLocalMD5")_
+				)
+		Next
+	End If
+	
+	Set BEnd_GetImageSources = objReturn
+End Function
+
+' Reads Windows-style .ini file and returns a hash array ("Scripting.Dictionary" object)
+' Returns Nothing if given file does not exist
+' http://stackoverflow.com/questions/21825192/read-data-from-ini-file
+Function BEnd_ReadIniFile(sFSpec)
+	Dim dicTmp, tsIn, objFSO
+	
+	If not Win_FileExists(sFSpec) Then
+		' Given ini not found
+		Set BEnd_ReadIniFile = Nothing
+		Exit Function
+	End If
+	
+	Set dicTmp = CreateObject("Scripting.Dictionary")
+	Set objFSO = CreateObject("Scripting.FileSystemObject")
+	Set tsIn = objFSO.OpenTextFile(sFSpec)
+	
+	Dim sLine, sSec, aKV
+	Do Until tsIn.AtEndOfStream
+		sLine = tsIn.ReadLine()
+		' Replace tab with space
+		sLine = Replace(sLine, Chr(9), " ")
+		sLine = Trim(sLine)
+		If ";" = Left(sLine, 1) Or "#" = Left(sLine, 1) Then
+			' This is remark, do nothing
+		ElseIf "[" = Left(sLine, 1) Then
+			sSec = Mid(sLine, 2, Len(sLine) - 2)
+			Set dicTmp(sSEc) = CreateObject("Scripting.Dictionary")
+		Else
+			If "" <> sLine Then
+				aKV = Split(sLine, "=")
+				If 1 = UBound(aKV) Then
+					dicTmp(sSec)(Trim(aKV(0))) = Trim(aKV(1))
+				End If
+			End If
+		End If
+	Loop
+	
+	tsIn.Close
+	Set BEnd_ReadIniFile = dicTmp
+End Function
+
 Function BEnd_FileMD5IsEqual(strFilePath, strMD5)
 	Dim strMD5Cmd, exitcode, boolResult
 	

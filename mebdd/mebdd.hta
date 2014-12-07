@@ -57,6 +57,7 @@
 	
 	Const REG_INSTALL_PATH = "SOFTWARE\MEB Finland\mebdd"
 	Const REG_INSTALL_KEY = "path_mebdd"
+	Const REG_HKLM_PATH = "SOFTWARE\MEB Finland\mebdd"
 	Const REG_HKCU_PATH = "Software\MEB Finland\mebdd"
 	Const REG_LAST_TAG_KEY = "LastTag"
 	Const REG_LAST_LANGUAGE_KEY = "LastLanguage"
@@ -89,8 +90,9 @@
 	'  - tag 'local_image' is reserved for locally selected image file
 	'  - tag 'local_zero' is reserved for local zero image
 	
-	Dim IMAGE_SOURCE
+	Dim IMAGE_SOURCE, IMAGE_SOURCE_PATH
 	Set IMAGE_SOURCE = CreateObject("Scripting.Dictionary")
+	IMAGE_SOURCE_PATH = Win_GetMEBDDInstallationPath() & "\mebdd.ini"
 	SetImageSources
 	
 	Dim strCurrentImageTag
@@ -119,38 +121,8 @@
 		' Remove all existing definitions
 		IMAGE_SOURCE.RemoveAll()
 		
-		' KTP & KOE
-		IMAGE_SOURCE.Add "ktp", Array(_
-			VBGT_Get("Digabi exam server"),_
-			VBGT_Get("Digabi exam server (KTP)"),_
-			"http://kurko.digabi.fi/latest/ktp.zip", "http://kurko.digabi.fi/latest/ktp.zip.md5", Win_GetLocalImageDirectoryPath() & "ktp.dd",_
-			REG_HKCU_PATH,"MD5_digabiktp_remote", "MD5_digabiktp_local")
-			
-		IMAGE_SOURCE.Add "koe", Array(_
-			VBGT_Get("Digabi exam device"),_
-			VBGT_Get("Digabi exam device (KOE)"),_
-			"http://kurko.digabi.fi/latest/koe.zip", "http://kurko.digabi.fi/latest/koe.zip.md5", Win_GetLocalImageDirectoryPath() & "koe.dd",_
-			REG_HKCU_PATH, "MD5_digabikoe_remote", "MD5_digabikoe_local")
+		Set IMAGE_SOURCE = BEnd_GetImageSources(IMAGE_SOURCE_PATH)
 		
-		' DigabiOS demo
-		'IMAGE_SOURCE.Add "digabi64", Array(_
-		'	VBGT_Get("DigabiOS 64bit"),_
-		'	VBGT_Get("DigabiOS demo operating system, 64 bit"),_
-		'	"https://digabi.fi/64bit", "https://digabi.fi/64bit/md5", Win_GetLocalImageDirectoryPath() & "DigabiOS-64bit.dd",_
-		'	REG_HKCU_PATH, "MD5_digabi64_remote", "MD5_digabi64_local")
-			
-		'IMAGE_SOURCE.Add "digabi32", Array(_
-		'	VBGT_Get("DigabiOS 32bit"),_
-		'	VBGT_Get("DigabiOS demo operating system, 32 bit"),_
-		'	"https://digabi.fi/32bit", "https://digabi.fi/32bit/md5", Win_GetLocalImageDirectoryPath() & "DigabiOS-32bit.dd",_
-		'	REG_HKCU_PATH, "MD5_digabi32_remote", "MD5_digabi32_local")
-
-		' Local tests
-		'IMAGE_SOURCE.Add "ktplocal", Array("Digabi KTP", "Digabin koetilan palvelin (KTP), paikallinen", "http://127.0.0.1:8080/ktp.zip", "http://127.0.0.1:8080/ktp.zip.md5", Win_GetLocalImageDirectoryPath() & "ktp.dd", REG_HKCU_PATH, "MD5_ktplocal_remote", "MD5_ktplocal_local")
-		'IMAGE_SOURCE.Add "koelocal", Array("Digabi KOE", "Digabin kokelaan p‰‰telaite (KOE), paikallinen", "http://127.0.0.1:8080/koe.zip", "http://127.0.0.1:8080/koe.zip.md5", Win_GetLocalImageDirectoryPath() & "koe.dd", REG_HKCU_PATH, "MD5_koelocal_remote", "MD5_koelocal_local")
-		'IMAGE_SOURCE.Add "ktplocal", Array("Digabi KTP", "Digabin koetilan palvelin (KTP), paikallinen", "http://192.168.0.1/meb/ktp.zip", "http://192.168.0.1/meb/ktp.zip.md5", Win_GetLocalImageDirectoryPath() & "ktp.dd", REG_HKCU_PATH, "MD5_ktplocal_remote", "MD5_ktplocal_local")
-		'IMAGE_SOURCE.Add "koelocal", Array("Digabi KOE", "Digabin kokelaan p‰‰telaite (KOE), paikallinen", "http://192.168.0.1/meb/koe.zip", "http://192.168.0.1/meb/koe.zip.md5", Win_GetLocalImageDirectoryPath() & "koe.dd", REG_HKCU_PATH, "MD5_koelocal_remote", "MD5_koelocal_local")
-
 		' Do not change these
 		'IMAGE_SOURCE.Add "local_image", Array(VBGT_Get("Local file (.iso, .dd)"),"<input type=""button"" id=""buttonOpenFile"" value=""" & VBGT_Get("Select file") & """ onClick=""AskImageFilePath()"">", "", "", "", "", "", "")
 
@@ -160,11 +132,15 @@
 	Sub LogMessage (strMessage)
 		Dim objFSO, objFile
 		
-		Set objFSO = CreateObject("Scripting.FileSystemObject")
-		' Open file for appending (8)
-		Set objFile = objFSO.OpenTextFile(MEBDD_LOG_FILE_PATH, 8, True)
-		objFile.WriteLine(Date & " " & Time & " : " & strMessage)
-		objFile.Close
+		If IsEmpty(MEBDD_LOG_FILE_PATH) or IsNull(MEBDD_LOG_FILE_PATH) Then
+			MsgBox "Error message while initialising: " & strMessage
+		Else
+			Set objFSO = CreateObject("Scripting.FileSystemObject")
+			' Open file for appending (8)
+			Set objFile = objFSO.OpenTextFile(MEBDD_LOG_FILE_PATH, 8, True)
+			objFile.WriteLine(Date & " " & Time & " : " & strMessage)
+			objFile.Close
+		End If
 	End Sub
 	
 	' Retrieve all remote MD5 digests and store them to HKCU registry
