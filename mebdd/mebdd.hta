@@ -361,9 +361,15 @@
 		If (n = 0) Then
 			objWriteRadioButtonArea.InnerHTML = "<p>" & VBGT_Get("No USB memories found. Please insert one or more USB memories to your computer.") & "</p>"
 			objRemoveRadioButtonArea.InnerHTML = "<p>" & VBGT_Get("No USB memories found. Please insert one or more USB memories to your computer.") & "</p>"
+			' Disable Select All buttons
+			buttonWriteSelectall.disabled = True
+			buttonRemoveSelectall.disabled = True
 		Else
 			objWriteRadioButtonArea.InnerHTML = "<p>" & VBGT_Get("Select USB memories to write:") & "</p>" & strWriteRadioHTML
 			objRemoveRadioButtonArea.InnerHTML = "<p>" & VBGT_Get("Select USB memories to undo:") & "</p>" & strRemoveRadioHTML
+			' Enable Select All buttons
+			buttonWriteSelectall.disabled = False
+			buttonRemoveSelectall.disabled = False
 		End If
 		
 		CheckSelectedDrive
@@ -419,10 +425,12 @@
 		objPhase1Heading.InnerHTML = VBGT_Get("Phase 1: Update image files")
 		objPhase2Heading.InnerHTML = VBGT_Get("Phase 2: Select image to write")
 		objPhase3Heading.InnerHTML = VBGT_Get("Phase 3: Select USB memories")
+		buttonWriteSelectall.Value = VBGT_Get("Select All")
 		objPhase4Heading.InnerHTML = VBGT_Get("Phase 4: Write USB memories")
 		objPhase4Verify.InnerHTML = VBGT_Get("Verify written USB memories for errors")
 		buttonWriteImage.Value = VBGT_Get("Write USB memories")
 		objPhase5Heading.InnerHTML = VBGT_Get("Phase 5: Remove image from USB memories")
+		buttonRemoveSelectall.Value = VBGT_Get("Select All")
 		buttonRemoveImage.Value = VBGT_Get("Remove image")
 	End Sub
 	
@@ -448,6 +456,26 @@
 		' formImageName.disabled = False
 	End Sub
 	
+	' select all drives from given radio button group
+	' strRadioType can be either "write" or "remove"
+	Sub SelectAllDrives (strRadioType)
+		Dim n, strRadioPrefix, objCheckbox
+		
+		If strRadioType = "write" Then
+			strRadioPrefix = "formWriteDisk_"
+		ElseIf strRadioType = "remove" Then
+			strRadioPrefix = "formRemoveDisk_"
+		Else
+			LogMessage("Warning: SelectAllDrives called with unknown radio type: " & strRadioType)
+			strRadioPrefix = "formWriteDisk_"
+		End If
+		
+		' Loop through all checkboxes (intCurrentDriveCount is global)
+		For n = 1 to intCurrentDriveCount
+			document.getElementById(strRadioPrefix & n).checked = True
+		Next
+	End Sub
+	
 	' enumerate selected drives from given radio button group
 	' strRadioType can be either "write" or "remove"
 	Function GetSelectedDrives (strRadioType)
@@ -467,10 +495,10 @@
 		
 		' Loop through all checkboxes (intCurrentDriveCount is global)
 		For n = 1 to intCurrentDriveCount
-			If Eval(strRadioPrefix & n & ".Checked") Then
+			If document.getElementById(strRadioPrefix & n).Checked Then
 				nn = nn + 1
 				ReDim Preserve arrSelectedDrives(nn)
-				arrSelectedDrives(nn) = Eval(strRadioPrefix & n & ".value")
+				arrSelectedDrives(nn) = document.getElementById(strRadioPrefix & n).value
 			End If
 			SetWriteStatus(0)
 		Next
@@ -975,6 +1003,7 @@
 	<span class="radio_disk_normal">
 		<span id="objWriteRadioButtonArea"></span>
 	</span>
+	<input type="button" id="buttonWriteSelectall" value="Select All" onclick="SelectAllDrives('write')">
 </span>
 
 <span id="objPhase3Status"></span>
@@ -998,6 +1027,7 @@
 	<span class="radio_disk_normal">
 		<span id="objRemoveRadioButtonArea"></span>
 	</span>
+	<input type="button" id="buttonRemoveSelectall" value="Select All" onclick="SelectAllDrives('remove')"><br/>
 	<input type="button" id="buttonRemoveImage" value="Remove" onclick="RemoveImage()">
 	<br/><br/>
 	<span id="objPhase5Status"></span>
