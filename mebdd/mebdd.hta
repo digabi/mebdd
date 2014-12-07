@@ -647,8 +647,13 @@
 		Else
 			ProgressDisable
 			LogMessage("Image download failed, error: " & BEnd_LastError)
-			AppendWriteStatus(VBGT_Get("The image data download failed."))
-			MsgBox VBGT_Get("The image data download failed."), 16, VBGT_Get("Error")
+			If BEnd_LastError = "CURL_ERROR_23" Then
+				AppendWriteStatus(VBGT_Get("The image data download failed: Disk Full"))
+				MsgBox VBGT_Get("The image data download failed: Disk Full"), 16, VBGT_Get("Error")
+			Else
+				AppendWriteStatus(VBGT_Get("The image data download failed."))
+				MsgBox VBGT_Get("The image data download failed."), 16, VBGT_Get("Error")
+			End If
 
 			' Delete failed temporary path & hash
 			If Win_FolderExists(strLocalPath) and not Win_DeleteFolder(strLocalPath) Then
@@ -966,6 +971,8 @@
 	Sub Window_Close
 		LogMessage "Killing all subprocesses"
 		
+		ProgressEnable(VBGT_Get("Exiting, please wait..."))
+		
 		' Kill subprocesses
 		If not Win_KillMySubprocesses() Then
 			LogMessage "Failed to kill subprocesses: " & Win_LastError
@@ -975,9 +982,14 @@
 		window.clearInterval(objTimerOnload)
 		window.clearInterval(objTimerScandisks)
 		
+		' Wait for pending jobs to terminate
+		BEnd_Wait(3000)
+		
 		' Log exit
 		LogMessage "Exiting by user"
+		ProgressDisable
 		window.close()
+		LogMessage "Exited"
 	End Sub
 	
 </script>

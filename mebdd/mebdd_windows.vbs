@@ -28,6 +28,35 @@ Const KEY_SET_VALUE = &H0002
 Dim Win_LastError
 
 
+' Checks if function [func_name] exists. Returns TRUE if it does
+' http://stackoverflow.com/questions/921364/is-there-any-way-to-check-to-see-if-a-vbscript-function-is-defined
+Function Win_FunctionExists (strFunctionName)
+	Dim boolResult, f
+	
+	boolResult = False 
+
+	On Error Resume Next
+
+	Set f = GetRef(strFunctionName)
+
+	If Err.number = 0 Then
+		boolResult = True
+	End If 	
+	
+	On Error GoTo 0
+
+	Win_FunctionExists = boolResult
+End Function
+
+' Calls upstrem logging function and if it does not exists, creates a dialog
+Sub Win_LogMessage (strMessage)
+	If Win_FunctionExists("LogMessage") Then
+		LogMessage strMessage
+	Else
+		MsgBox strMessage, 0+64, "Global LogMessage() missing"
+	End If
+End Sub
+
 Function Win_GetEnvironmentString(strVariableName)
 	Dim objShell
 	Set objShell = CreateObject("WScript.Shell")
@@ -391,8 +420,11 @@ Function Win_KillProcesses (intPID, boolKillParent)
 		For Each objProcess in colProcessList 
 			intResult = objProcess.Terminate
 			If intResult <> 0 Then
+				Win_LogMessage "Failed to terminate process #" & objProcess.ProcessId & " (" & objProcess.Name & ")"
 				Win_LastError = "KILL_FAILED"
 				boolResult = False
+			Else
+				Win_LogMessage "Terminated process #" & objProcess.ProcessId & " (" & objProcess.Name & ")"
 			End If
 		Next
 	End If

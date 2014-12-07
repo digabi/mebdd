@@ -111,7 +111,7 @@ Function BEnd_DownloadImage (strURL, strDestinationFile)
 	If (exitcode = 0) Then
 		boolResult = True
 	Else
-		BEnd_LastError = exitcode
+		BEnd_LastError = "CURL_ERROR_" & exitcode
 	End If
 	
 	BEnd_DownloadImage = boolResult
