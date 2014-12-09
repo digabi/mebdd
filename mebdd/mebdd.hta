@@ -74,7 +74,9 @@
 	' Set image update method. Possible values are:
 	' "individual" - images can be updated individualy
 	' "group" - if any of the images are updated all images must be updated
-	Const IMAGE_UPDATE_METHOD = "group"
+	' This can be set with mebdd.ini, *System / ImageUpdateMethod
+	Dim IMAGE_UPDATE_METHOD
+	IMAGE_UPDATE_METHOD = "group"
 	
 	' NOTE! NOTE! We have to give the FULL PATH for these command-line tools.
 	' Please make sure you change these in case you relocate the utilities.

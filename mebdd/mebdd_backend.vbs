@@ -69,17 +69,29 @@ Function BEnd_GetImageSources (strIniFile)
 		' We have content
 		' Loop through all sections
 		For Each strSection in objIni.Keys()
-			' REG_HKCU_PATH is a global variable
-			objReturn.Add strSection, Array(_
-				objIni(strSection)("Legend"),_
-				objIni(strSection)("Description"),_
-				objIni(strSection)("URLimage"),_
-				objIni(strSection)("URLMD5"),_
-				Win_GetLocalImageDirectoryPath() & objIni(strSection)("LocalFile"),_
-				REG_HKCU_PATH,_
-				objIni(strSection)("RegRemoteMD5"),_
-				objIni(strSection)("RegLocalMD5")_
-				)
+			If Left(strSection, 1) = "*" Then
+				' Section names beginning with * have special meaning
+				If LCase(strSection) = "*system" Then
+					' This section redefines some global system settings
+					If objIni(strSection).Exists("imageupdatemethod") Then
+						IMAGE_UPDATE_METHOD = objIni(strSection)("imageupdatemethod")
+					End If
+				End If
+			Else
+				' This section is a normal one and defines an image
+				
+				' REG_HKCU_PATH is a global variable
+				objReturn.Add strSection, Array(_
+					objIni(strSection)("legend"),_
+					objIni(strSection)("description"),_
+					objIni(strSection)("urlimage"),_
+					objIni(strSection)("urlmd5"),_
+					Win_GetLocalImageDirectoryPath() & objIni(strSection)("localfile"),_
+					REG_HKCU_PATH,_
+					objIni(strSection)("regremotemd5"),_
+					objIni(strSection)("reglocalmd5")_
+					)
+			End If
 		Next
 	End If
 	
@@ -117,7 +129,7 @@ Function BEnd_ReadIniFile(sFSpec)
 			If "" <> sLine Then
 				aKV = Split(sLine, "=")
 				If 1 = UBound(aKV) Then
-					dicTmp(sSec)(Trim(aKV(0))) = Trim(aKV(1))
+					dicTmp(sSec)(Trim(LCase(aKV(0)))) = Trim(aKV(1))
 				End If
 			End If
 		End If
