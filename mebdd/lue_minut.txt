@@ -39,6 +39,17 @@ mebdd_read käyttää MD5-kirjastoa md5customised:
 Muutokset
 ---------
 
+1.3i (18.12.2014)
+- lataus uuden formaatin (latest.txt ja versiokohtaiset hakemistot) mukaisesti
+- uudet ladattavat imaget otetaan käyttöön vain siinä tapauksessa että kaikki
+  imaget on ladattu onnistuneesti
+
+1.3h (9.12.2014)
+- imageiden määrittely mebdd.ini-tiedostolla
+- korjattu virhe: yli 10 muistitikun kirjoittaminen samanaikaisesti
+- select all usb memories by single click
+- disabled standard exit icon and added Close button which kills all subprocesses
+
 1.3g (5.12.2014)
 - korjattu virhe: URL:t kehityspalvelimelta
 - debug-loki näkyy näytöllä

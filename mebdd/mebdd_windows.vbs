@@ -343,19 +343,24 @@ Function Win_DialogImageFile (strDialogHeader, strStartingPath, strFileSpec)
 	Win_DialogImageFile = strResultPath
 End Function
 
-' Delete given file [strFilePath]. Returns FALSE if given file does not exist.
+' Delete given file [strFilePath]. Returns FALSE if the file still
+' exists after delete.
 Function Win_DeleteFile (strFilePath)
 	Dim objFSO
 	Set objFSO = CreateObject("Scripting.FileSystemObject")
 	If objFSO.FileExists(strFilePath) Then 
 		objFSO.DeleteFile strFilePath
-		Win_DeleteFile = True
-	Else
+	End If
+	
+	If objFSO.FileExists(strFilePath) Then
 		Win_DeleteFile = False
+	Else
+		Win_DeleteFile = True
 	End If
 End Function
 
-' Delete given folder (strPath). Returns FALSE if given folder does not exist.
+' Delete given folder (strPath). Returns FALSE if the folder still
+' exists after delete.
 ' The function does not distinguish between folders that have contents and those that do not.
 ' The specified folder is deleted regardless of whether or not it has contents.
 Function Win_DeleteFolder (strPath)
@@ -363,9 +368,12 @@ Function Win_DeleteFolder (strPath)
 	Set objFSO = CreateObject("Scripting.FileSystemObject")
 	If objFSO.FolderExists(strPath) Then
 		objFSO.DeleteFolder strPath
-		Win_DeleteFolder = True
-	Else
+	End If
+	
+	If objFSO.FolderExists(strPath) Then
 		Win_DeleteFolder = False
+	Else
+		Win_DeleteFolder = True
 	End If
 End Function
 

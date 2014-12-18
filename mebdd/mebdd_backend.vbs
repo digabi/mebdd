@@ -76,6 +76,9 @@ Function BEnd_GetImageSources (strIniFile)
 					If objIni(strSection).Exists("imageupdatemethod") Then
 						IMAGE_UPDATE_METHOD = objIni(strSection)("imageupdatemethod")
 					End If
+					If objIni(strSection).Exists("imageversionurl") Then
+						IMAGE_VERSION_URL = objIni(strSection)("imageversionurl")
+					End If
 				End If
 			Else
 				' This section is a normal one and defines an image
@@ -89,7 +92,8 @@ Function BEnd_GetImageSources (strIniFile)
 					Win_GetLocalImageDirectoryPath() & objIni(strSection)("localfile"),_
 					REG_HKCU_PATH,_
 					objIni(strSection)("regremotemd5"),_
-					objIni(strSection)("reglocalmd5")_
+					objIni(strSection)("reglocalmd5"),_
+					objIni(strSection)("reglocalversion")_
 					)
 			End If
 		Next
@@ -139,11 +143,21 @@ Function BEnd_ReadIniFile(sFSpec)
 	Set BEnd_ReadIniFile = dicTmp
 End Function
 
+' Check if file strFilePath as MD5 sum strMD5.
+' Returns:
+' - True: The MD5 of the file equals to given strMD5
+' - False: The file has different MD5
 Function BEnd_FileMD5IsEqual(strFilePath, strMD5)
 	Dim strMD5Cmd, exitcode, boolResult
 	
 	boolResult = False
 	BEnd_LastError = ""
+	
+	If not Win_FileExists(strFilePath) Then
+		BEnd_FileMD5IsEqual = False
+		BEnd_LastError = "MD5SUM_FILE_MISSING"
+		Exit Function
+	End If
 
 	strMD5Cmd = Chr(34) & BIN_MEBMD5 & Chr(34) & " " & Chr(34) & strFilePath & Chr(34) & " " & strMD5
 	
@@ -155,7 +169,9 @@ Function BEnd_FileMD5IsEqual(strFilePath, strMD5)
 
 	If exitcode = 0 Then
 		' Error in MEBMD5
-		BEnd_LogMessage "Varoitus! MEBMD5-komento tuotti virheen: " & exitcode
+		BEnd_LogMessage "Warning! MEBMD5 exits with exitcode ZERO, maybe an unhandled exception?"
+		boolResult = False
+		BEnd_LastError = "MD5SUM_EXCEPTION"
 	End If
 	
 	If exitcode = 1 Then
@@ -204,7 +220,35 @@ Function BEnd_DownloadImage (strURL, strDestinationFile)
 End Function
 
 Function BEnd_DownloadMD5 (strURL)
-	Dim objBrowser, strMD5, intLoops
+	Dim strMD5
+	strMD5 = BEnd_DownloadText(strURL)
+	
+	' We expect the MD5 to be the first part of the string
+	strMD5 = Trim(strMD5)
+	If (InStr(strMD5, " ") > 0) Then
+		' There is at least one space in the string, take the leftmost part
+		strMD5 = Left(strMD5, InStr(strMD5, " ")-1)
+	End If
+	
+	BEnd_DownloadMD5 = strMD5 
+End Function
+
+Function BEnd_DownloadVersion (strURL)
+	Dim strVersion, objRE
+	Set objRE = New RegExp
+	
+	strVersion = BEnd_DownloadText(strURL)
+	
+	' Accept only digits and commas
+	objRE.Global = True
+	objRE.Pattern = "[^\d]"
+	strVersion = objRE.Replace(strVersion, "")
+	
+	BEnd_DownloadVersion = strVersion
+End Function
+
+Function BEnd_DownloadText (strURL)
+	Dim objBrowser, strResult, intLoops
 	Const intTimeoutLoops = 10
 	
 	'Set objBrowser = CreateObject("MSXML2.XMLHTTP")
@@ -221,7 +265,7 @@ Function BEnd_DownloadMD5 (strURL)
 			objBrowser.waitForResponse(1000)
 			If Err.Number <> 0 Then
 				' Browser returns error code
-				strMD5 = ""
+				BEnd_DownloadText = ""
 				BEnd_LastError = "BROWSER_ERROR"
 				Exit Function
 			End If
@@ -231,7 +275,7 @@ Function BEnd_DownloadMD5 (strURL)
 			intLoops = intLoops+1
 			If intLoops > intTimeoutLoops Then
 				' Timeout
-				strMD5 = ""
+				BEnd_DownloadText = ""
 				BEnd_LastError = "TIMEOUT"
 				Exit Function
 			End If
@@ -239,25 +283,16 @@ Function BEnd_DownloadMD5 (strURL)
 	
 		If objBrowser.Status = 200 Then
 			' Everything was OK
-			strMD5 = objBrowser.responseText
+			BEnd_DownloadText = objBrowser.responseText
 		Else
-			strMD5 = ""
+			BEnd_DownloadText = ""
 			BEnd_LastError = objBrowser.Status
 		End If
 	Else
 		' No browser object
-		strMD5 = ""
+		BEnd_DownloadText = ""
 		BEnd_LastError = "COULD_NOT_CONNECT_SERVER"
 	End If
-	
-	' We expect the MD5 to be the first part of the string
-	strMD5 = Trim(strMD5)
-	If (InStr(strMD5, " ") > 0) Then
-		' There is at least one space in the string, take the leftmost part
-		strMD5 = Left(strMD5, InStr(strMD5, " ")-1)
-	End If
-	
-	BEnd_DownloadMD5 = strMD5 
 End Function
 
 Function BEnd_DownloadMD5AndStore (strURL, strKeyPath, strKeyName)
@@ -284,6 +319,116 @@ Function BEnd_DownloadMD5AndStore (strURL, strKeyPath, strKeyName)
 	End If
 	
 	BEnd_DownloadMD5AndStore = boolResult
+End Function
+
+' Download image file from strUrlImage and image hash from strUrlMD5. Report
+' progress to strCallbackFuncName and use strImageName (an user-friendly name of the
+' image) when reporting.
+' Returns and Scripting.Dictionary object with two values, "filename" and "md5"
+' - on success:
+'      "filename" contains a pathname to the verified image file
+'      "md5" contains the hash value of the image
+'               
+' - on failure:
+'      both values are set as an empty string + sets BEnd_LastError
+Function BEnd_DownloadAndVerify(strCallbackFuncName, strUrlImage, strUrlMD5, strFinalImageFilename, strImageName)
+	Dim objReportFunc, objResult, strDownloadedMD5, strLocalPath, strLocalFile, boolZIP, strZipPath, strZipFile, boolDownloadOK
+	
+	Set objResult = CreateObject("Scripting.Dictionary")
+	objResult("filename") = ""
+	objResult("md5") = ""
+	
+	' Get callback function object
+	Set objReportFunc = GetRef(strCallbackFuncName)
+	
+	objReportFunc(BEnd_FMT(VBGT_Get("Downloading image checksum for image '%x'..."), Array(strImageName)))
+	BEnd_LogMessage "Downloading image checksum from " & strUrlMD5
+	
+	' Download MD5
+	strDownloadedMD5 = BEnd_DownloadMD5(strUrlMD5)
+	
+	If strDownloadedMD5 = "" Then
+		' MD5 download failed
+		BEnd_LogMessage "Failed to download MD5: " & BEnd_LastError
+		' We do not set BEnd_LastMessage as we want to report that to the upstream
+		Set BEnd_DownloadAndVerify = objResult
+		Exit Function
+	End If
+	
+	' Create a local temporary path to store files
+	strLocalPath = Win_GetTempFilename()
+	Win_CreateDirs(strLocalPath)
+	
+	' Are we downloading a zip?
+	boolZIP = False
+	If UCase(Win_GetFileExtension(strUrlImage)) = "ZIP" Then
+		boolZIP = True
+	End If
+	
+	' The Image will be downloaded to strLocalFile
+	strLocalFile = strLocalPath & "\" & Win_GetBasename(Win_GetTempFilename())
+	
+	' Download image file
+	objReportFunc(BEnd_FMT(VBGT_Get("Downloading image '%x' data from the server. This takes a long time..."), Array(strImageName)))
+	boolDownloadOK = BEnd_DownloadImage(strUrlImage, strLocalFile)
+	
+	' If download failed, remove temporary stuff and exit
+	If not boolDownloadOK Then
+		If not Win_DeleteFolder(strLocalPath) Then
+			BEnd_LogMessage "Warning: Failed to remove temporary folder " & strLocalPath
+		End If
+		' We do not set BEnd_LastMessage as we want to report that to the upstream
+		Set BEnd_DownloadAndVerify = objResult
+		Exit Function
+	End If
+	
+	' Have we downloaded a zip file? Unpack it to another temp file
+	If boolZIP Then
+		' Store ZIP path
+		strZipFile = strLocalFile
+		
+		' Create new temporary folder & filename
+		strLocalPath = Win_GetTempFilename()
+		Win_CreateDirs(strLocalPath)
+		strLocalFile = strLocalPath & "\" & Win_GetBaseName(strFinalImageFilename)
+		
+		objReportFunc(BEnd_FMT(VBGT_Get("Unpacking the image '%x' data..."), Array(strImageName)))
+
+		If not BEnd_Unbox("zip", strZipFile, strLocalFile) Then
+			BEnd_LogMessage "Image unboxing failed, error: " & BEnd_LastError
+			
+			' Delete zip file
+			If not Win_DeleteFile(strZipFile) Then
+				LogMessage("Warning: Could not remove zip file " & strZipFile)
+			End If
+
+			BEnd_LastError = "UNBOXING_FAILED"
+			Set BEnd_DownloadAndVerify = objResult
+			Exit Function
+		End If
+		
+		BEnd_LogMessage "The ZIP package has been unpacked from " & strZipFile & " to " & strLocalFile
+		If not Win_DeleteFile(strZipFile) Then
+			BEnd_LogMessage "Warning: Could not remove temporary zip file " & strZipFile
+		End If
+		If not Win_DeleteFolder(Win_GetPathName(strZipFile)) Then
+			BEnd_LogMessage "Warning: Could not remove temporary zip directory " & Win_GetPathName(strZipFile)
+		End If
+	End If
+	
+	' Check MD5 of the downloaded and possibly unpacked file
+	objReportFunc(BEnd_FMT(VBGT_Get("Checking image '%x' data..."), Array(strImageName)))
+	If BEnd_FileMD5IsEqual(strLocalFile, strDownloadedMD5) Then
+		' The MD5 matches
+		objResult("filename") = strLocalFile
+		objResult("md5") = strDownloadedMD5
+		BEnd_LogMessage "MD5 check passed for file " & strLocalFile
+	Else
+		BEnd_LastError = "CHECKSUM_MISMATCH"
+		BEnd_LogMessage "MD5 check failed for file " & strLocalFile
+	End If
+	
+	Set BEnd_DownloadAndVerify = objResult
 End Function
 
 Function BEnd_WriteImage (strImageFile, arrSelectedDrives, boolVerifyImage)

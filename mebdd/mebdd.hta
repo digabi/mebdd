@@ -18,7 +18,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 	
 -->
-<title>MEB DD 1.3h</title>
+<title>MEB DD 1.3i</title>
 <HTA:APPLICATION 
      APPLICATIONNAME="MEB DD"
      SCROLL="yes"
@@ -67,9 +67,10 @@
 	Const IMAGE_SOURCE_URL_IMAGE = 2
 	Const IMAGE_SOURCE_URL_MD5 = 3
 	Const IMAGE_SOURCE_LOCAL_PATH = 4
-	Const IMAGE_SOURCE_MD5_REG_PATH = 5
+	Const IMAGE_SOURCE_REG_PATH = 5
 	Const IMAGE_SOURCE_MD5_REMOTE_REG_KEY = 6
 	Const IMAGE_SOURCE_MD5_LOCAL_REG_KEY = 7
+	CONST IMAGE_SOURCE_VERSION_KEY = 8
 	
 	' Set image update method. Possible values are:
 	' "individual" - images can be updated individualy
@@ -77,6 +78,10 @@
 	' This can be set with mebdd.ini, *System / ImageUpdateMethod
 	Dim IMAGE_UPDATE_METHOD
 	IMAGE_UPDATE_METHOD = "group"
+	
+	' Image version URL
+	' This can be set with mebdd.ini, *System / ImageVersionURL
+	Dim IMAGE_VERSION_URL
 	
 	' NOTE! NOTE! We have to give the FULL PATH for these command-line tools.
 	' Please make sure you change these in case you relocate the utilities.
@@ -87,18 +92,18 @@
 	BIN_MEBMD5 = Win_GetMEBDDInstallationPath() & "\mebmd5.exe"
 	BIN_UNZIP = Win_GetMEBDDInstallationPath() & "\unzip.exe"
 	
-	' Data for Image Sources
-	'  - tag names should contain only alphanumeric characters (a-z, A-Z, 0-9)
-	'  - tag 'local_image' is reserved for locally selected image file
-	'  - tag 'local_zero' is reserved for local zero image
-	
 	Dim IMAGE_SOURCE, IMAGE_SOURCE_PATH
 	Set IMAGE_SOURCE = CreateObject("Scripting.Dictionary")
 	IMAGE_SOURCE_PATH = Win_GetMEBDDInstallationPath() & "\mebdd.ini"
 	SetImageSources
 	
+	' Currently selected image tag
 	Dim strCurrentImageTag
 	strCurrentImageTag = ""
+	
+	' Currently present remote version number (c.f. GetRemoteVersions)
+	Dim strCurrentRemoteVersion
+	strCurrentRemoteVersion = ""
 	
 	' Data for language files
 	Dim LANGUAGES
@@ -145,24 +150,40 @@
 		End If
 	End Sub
 	
-	' Retrieve all remote MD5 digests and store them to HKCU registry
+	' Retrieve remote version and set it to global variable str
 	Sub GetRemoteVersions
-		Dim strThisTag, strThisDigest
+		Dim strThisTag, strThisDigest, strRemoteVersion, strMD5Url
 		
-		For Each strThisTag in IMAGE_SOURCE
-			If IMAGE_SOURCE(strThisTag)(IMAGE_SOURCE_URL_MD5) <> "" Then
-				LogMessage("Retrieving MD5 digest from " & IMAGE_SOURCE(strThisTag)(IMAGE_SOURCE_URL_MD5))
-				strThisDigest = BEnd_DownloadMD5(IMAGE_SOURCE(strThisTag)(IMAGE_SOURCE_URL_MD5))
-				If strThisDigest = "" Then
-					' We have an error
-					LogMessage("Error while retrieving MD5 digest from " & IMAGE_SOURCE(strThisTag)(IMAGE_SOURCE_URL_MD5) & ": " & BEnd_LastError)
-				End If
-				
-				If not Win_WriteRegKeyHKCU(REG_HKCU_PATH, IMAGE_SOURCE(strThisTag)(IMAGE_SOURCE_MD5_REMOTE_REG_KEY), strThisDigest) Then
-					LogMessage("Failed to write to registry")
-				End If
+		strRemoteVersion = ""
+		If IMAGE_VERSION_URL <> "" Then
+			LogMessage "Retrieving remote version from " & IMAGE_VERSION_URL
+			strRemoteVersion = BEnd_DownloadVersion(IMAGE_VERSION_URL)
+			LogMessage "Got: " & strRemoteVersion
+			If strRemoteVersion <> "" Then
+				strCurrentRemoteVersion = strRemoteVersion
 			End If
-		Next
+		End If
+		
+		If strCurrentRemoteVersion <> "" Then
+			For Each strThisTag in IMAGE_SOURCE
+				If IMAGE_SOURCE(strThisTag)(IMAGE_SOURCE_URL_MD5) <> "" Then
+					strMD5Url = BEnd_FMT(IMAGE_SOURCE(strThisTag)(IMAGE_SOURCE_URL_MD5), Array(strCurrentRemoteVersion))
+					
+					LogMessage("Retrieving MD5 digest from " & strMD5Url)
+					strThisDigest = BEnd_DownloadMD5(strMD5Url)
+					If strThisDigest = "" Then
+						' We have an error
+						LogMessage("Error while retrieving MD5 digest from " & strMD5Url & ": " & BEnd_LastError)
+					End If
+					
+					If not Win_WriteRegKeyHKCU(REG_HKCU_PATH, IMAGE_SOURCE(strThisTag)(IMAGE_SOURCE_MD5_REMOTE_REG_KEY), strThisDigest) Then
+						LogMessage("Failed to write to registry")
+					End If
+				End If
+			Next
+		Else
+			LogMessage "We could not get remote MD5 digests as the current remote version string is unset"
+		End If
 	End Sub
 
 	' Populates image update table from IMAGE_SOURCE (hash array) to
@@ -181,19 +202,19 @@
 			strThisRow = strThisRow & "<td>" & IMAGE_SOURCE(strThisTag)(IMAGE_SOURCE_LEGEND) & "</td>"
 			strThisRow = strThisRow & "<td>" & IMAGE_SOURCE(strThisTag)(IMAGE_SOURCE_DESCRIPTION) & "</td>"
 
-			strLocalDigest = Win_ReadRegKeyHKCU(IMAGE_SOURCE(strThisTag)(IMAGE_SOURCE_MD5_REG_PATH), IMAGE_SOURCE(strThisTag)(IMAGE_SOURCE_MD5_LOCAL_REG_KEY))
-			strRemoteDigest = Win_ReadRegKeyHKCU(IMAGE_SOURCE(strThisTag)(IMAGE_SOURCE_MD5_REG_PATH), IMAGE_SOURCE(strThisTag)(IMAGE_SOURCE_MD5_REMOTE_REG_KEY))
+			strLocalDigest = Win_ReadRegKeyHKCU(IMAGE_SOURCE(strThisTag)(IMAGE_SOURCE_REG_PATH), IMAGE_SOURCE(strThisTag)(IMAGE_SOURCE_MD5_LOCAL_REG_KEY))
+			strRemoteDigest = Win_ReadRegKeyHKCU(IMAGE_SOURCE(strThisTag)(IMAGE_SOURCE_REG_PATH), IMAGE_SOURCE(strThisTag)(IMAGE_SOURCE_MD5_REMOTE_REG_KEY))
 			
 			' Create action button
 			strActionCell = ""
-			If (not Win_FileExists(IMAGE_SOURCE(strThisTag)(IMAGE_SOURCE_LOCAL_PATH)) and strThisTag <> "local_image") Then
+			If (not Win_FileExists(IMAGE_SOURCE(strThisTag)(IMAGE_SOURCE_LOCAL_PATH))) Then
 			
 				' The image file does not exist. Offer download.
 				
 				If IMAGE_UPDATE_METHOD = "individual" Then
 					strActionCell = "<td><input type=""button""" & _
 						" id=""buttonSelect_" & strThisTag & """" & _
-						" onClick=""Download('" & strThisTag & "')"" value=""" & VBGT_Get("Download") & """></td>"
+						" onClick=""Download(Array('" & strThisTag & "'))"" value=""" & VBGT_Get("Download") & """></td>"
 				ElseIf IMAGE_UPDATE_METHOD = "group" Then
 					strActionCell = "<td>" & VBGT_Get("Download required") & "</td>"
 					' Add current tag to array of images to update
@@ -209,7 +230,7 @@
 				If IMAGE_UPDATE_METHOD = "individual" Then
 					strActionCell = "<td><input type=""button""" & _
 						" id=""buttonSelect_" & strThisTag & """" & _
-						" onClick=""Download('" & strThisTag & "')"" value=""" & VBGT_Get("Update") & """></td>"
+						" onClick=""Download(Array('" & strThisTag & "'))"" value=""" & VBGT_Get("Update") & """></td>"
 				ElseIf IMAGE_UPDATE_METHOD = "group" Then
 					strActionCell = "<td>" & VBGT_Get("Update available") & "</td>"
 					' Add current tag to array of images to update
@@ -487,191 +508,139 @@
 		GetSelectedDrives = arrSelectedDrives
 	End Function
 	
-	' Downloads given [strImageTag]. Returns TRUE on success, FALSE on failure.
+	' Callback function used by download backend to report progress
+	Sub DownloadReportProgress (strMessage)
+		ProgressEnable(strMessage)
+	End Sub
+	
+	' Downloads given image tags [arrImageTags]. Returns TRUE on success, FALSE on failure.
 	' If the IMAGE_SOURCE_URL_IMAGE of the given [strImageTag] is empty, does not download and returns SUCCESS
 	' If the IMAGE_SOURCE_URL_MD5 of the given [strImageTag] is empty, does not verify MD5
-	Function Download (strImageTag)
-		Dim boolResult, boolZIP, strLocalPath, strLocalFile, strThisImageTag
+	Function Download (arrImageTags)
+		Dim boolResult, boolDownloadSuccess, boolMoveSuccess, strTempFile, strThisImageTag, strThisImageLegend, _
+			strImageUrl, strMD5Url, _
+			objDownloadResult, objTempFiles, objTempFiles2, objImageMD5
+		Set objTempFiles = CreateObject("Scripting.Dictionary")
+		Set objTempFiles2 = CreateObject("Scripting.Dictionary")
+		Set objImageMD5 = CreateObject("Scripting.Dictionary")
 		
-		' If strImageTag is an array call self with all values in that array
-		If IsArray(strImageTag) Then
-			For Each strThisImageTag in strImageTag
-				If not Download(strThisImageTag) Then
-					' Download failed - fail all downloads
-					Download = False
-					Exit Function
+		boolDownloadSuccess = True
+		
+		' Download all images
+		For Each strThisImageTag in arrImageTags
+			strThisImageLegend = IMAGE_SOURCE(strThisImageTag)(IMAGE_SOURCE_LEGEND)
+			strImageUrl = BEnd_FMT(IMAGE_SOURCE(strThisImageTag)(IMAGE_SOURCE_URL_IMAGE), Array(strCurrentRemoteVersion))
+			strMD5Url = BEnd_FMT(IMAGE_SOURCE(strThisImageTag)(IMAGE_SOURCE_URL_MD5), Array(strCurrentRemoteVersion))
+			Set objDownloadResult = BEnd_DownloadAndVerify(_
+				"DownloadReportProgress",_
+				strImageUrl,_
+				strMD5Url,_
+				IMAGE_SOURCE(strThisImageTag)(IMAGE_SOURCE_LOCAL_PATH),_
+				strThisImageLegend _
+				)
+			strTempFile = objDownloadResult("filename")
+			
+			If strTempFile = "" Then
+				' Download or verify failed (exit loop)
+				If BEnd_LastError = "CURL_ERROR_23" Then
+					AppendWriteStatus(VBGT_Get("The image data download failed: Disk Full"))
+					MsgBox BEnd_FMT(VBGT_Get("The image data '%x' download failed: Disk Full"), Array(strThisImageLegend)), 16, VBGT_Get("Error")
+				Else
+					AppendWriteStatus(VBGT_Get("The image data download failed: " & BEnd_LastError))
+					MsgBox BEnd_FMT(VBGT_Get("The image data '%x' download failed."), Array(strThisImageLegend)), 16, VBGT_Get("Error")
+				End If
+				boolDownloadSuccess = False
+				Exit For
+			Else
+				' Download and verify succeeded
+				objTempFiles(strThisImageTag) = strTempFile
+				objImageMD5(strThisImageTag) = objDownloadResult("md5")
+			End If
+		Next
+		
+		ProgressDisable
+		
+		' If all downloads were successfully downloaded, move them into place
+		If boolDownloadSuccess Then
+			boolMoveSuccess = True
+			For Each strThisImageTag in arrImageTags
+				strThisImageLegend = IMAGE_SOURCE(strThisImageTag)(IMAGE_SOURCE_LEGEND)
+				objTempFiles2(strThisImageTag) = IMAGE_SOURCE(strThisImageTag)(IMAGE_SOURCE_LOCAL_PATH) & ".bak"
+				
+				If Win_FileExists(objTempFiles2(strThisImageTag)) and not Win_DeleteFile(objTempFiles2(strThisImageTag)) Then 
+					LogMessage "Moving image failed as could not remove old temporary file " & objTempFiles2(strThisImageTag)
+					boolMoveSuccess = False
+				End If
+				
+				' Store old image data
+				If boolMoveSuccess and Win_FileExists(IMAGE_SOURCE(strThisImageTag)(IMAGE_SOURCE_LOCAL_PATH)) Then
+					ProgressEnable(BEnd_FMT(VBGT_Get("Storing old image data '%x'..."), Array(strThisImageLegend)))
+					If not Win_MoveFile(IMAGE_SOURCE(strThisImageTag)(IMAGE_SOURCE_LOCAL_PATH), objTempFiles2(strThisImageTag)) Then
+						LogMessage "Moving old image failed as could not move from " & IMAGE_SOURCE(strThisImageTag)(IMAGE_SOURCE_LOCAL_PATH) & " to " & objTempFiles2(strThisImageTag)
+						boolMoveSuccess = False
+					Else
+						LogMessage "Old image moved from " & IMAGE_SOURCE(strThisImageTag)(IMAGE_SOURCE_LOCAL_PATH) & " to " & objTempFiles2(strThisImageTag)
+					End If
+				End If
+				
+				' Move file from temp to final location
+				ProgressEnable(BEnd_FMT(VBGT_Get("Moving new image data '%x'..."), Array(strThisImageLegend)))
+				If boolMoveSuccess and Win_FileExists(objTempFiles(strThisImageTag)) Then
+					If not Win_MoveFile(objTempFiles(strThisImageTag), IMAGE_SOURCE(strThisImageTag)(IMAGE_SOURCE_LOCAL_PATH)) Then
+						LogMessage "Moving image failed as could not move from " & objTempFiles(strThisImageTag) & " to " & IMAGE_SOURCE(strThisImageTag)(IMAGE_SOURCE_LOCAL_PATH)
+						boolMoveSuccess = False
+					Else
+						LogMessage "New image moved from " & objTempFiles(strThisImageTag) & " to " & IMAGE_SOURCE(strThisImageTag)(IMAGE_SOURCE_LOCAL_PATH)
+					End If
+				End If
+				
+				' Remove temporary directory
+				ProgressEnable(BEnd_FMT(VBGT_Get("Removing temporary directory of image '%x'"), Array(strThisImageLegend)))
+				If boolMoveSuccess and not Win_DeleteFolder(Win_GetPathname(objTempFiles(strThisImageTag))) Then
+					LogMessage "Could not remove temporary directory " & Win_GetPathname(objTempFiles(strThisImageTag))
+					boolMoveSuccess = False
+				End If
+				
+				If boolMoveSuccess and Win_FileExists(objTempFiles2(strThisImageTag)) Then
+					If not Win_DeleteFile(objTempFiles2(strThisImageTag)) Then
+						LogMessage "Could not remove previous image file " & objTempFiles2(strThisImageTag)
+					End If
 				End If
 			Next
 			
-			Download = True
-			Exit Function
-		End If
-		
-		' Quit if image URL is empty and return Success
-		If IMAGE_SOURCE(strImageTag)(IMAGE_SOURCE_URL_IMAGE) = "" Then
-			Download = True
-			Exit Function
-		End If
-		
-		' Make sure that strImageTag exists
-		If not IMAGE_SOURCE.Exists(strImageTag) Then
-			LogMessage BEnd_FMT("Tried to download image for tag '%x' but there is no such image tag", Array(strImageTag))
-			Download = False
-			Exit Function
-		End If
-		
-		If IMAGE_SOURCE(strImageTag)(IMAGE_SOURCE_URL_MD5) <> "" Then
-			' Download MD5 sum
-			ButtonsDisable
-			ProgressEnable(BEnd_FMT(VBGT_Get("Downloading checksum of image '%x' from the server..."), Array(IMAGE_SOURCE(strImageTag)(IMAGE_SOURCE_LEGEND))))
-			LogMessage "Downloading MD5 sum (" & IMAGE_SOURCE(strImageTag)(IMAGE_SOURCE_LEGEND) & ")"
-			If BEnd_DownloadMD5AndStore( _
-				IMAGE_SOURCE(strImageTag)(IMAGE_SOURCE_URL_MD5), _
-				IMAGE_SOURCE(strImageTag)(IMAGE_SOURCE_MD5_REG_PATH), _
-				IMAGE_SOURCE(strImageTag)(IMAGE_SOURCE_MD5_LOCAL_REG_KEY)) Then
-				' Success
-				LogMessage "Succeeded in downloading MD5 sum"
-			Else
-				' Fail
+			If boolMoveSuccess Then
+				' All files are now in place
+				For Each strThisImageTag in arrImageTags
+					If not Win_WriteRegKeyHKCU(IMAGE_SOURCE(strThisImageTag)(IMAGE_SOURCE_REG_PATH), IMAGE_SOURCE(strThisImageTag)(IMAGE_SOURCE_MD5_LOCAL_REG_KEY), objImageMD5(strThisImageTag)) Then
+						LogMessage "Failed to store new MD5 sum to registry, last error: " & Win_LastError
+					End If
+				Next
 				ProgressDisable
-				AppendWriteStatus(BEnd_FMT(VBGT_Get("Failed to download checksum from the server. Error code: %x"), Array(BEnd_LastError)))
-				Download = False
-				Exit Function
-			End If
-			ProgressDisable
-		End If
-		
-		' Create a local temporary path to store files
-		strLocalPath = Win_GetTempFilename()
-		Win_CreateDirs(strLocalPath)
-		
-		' Are we downloading a zip?
-		If UCase(Win_GetFileExtension(IMAGE_SOURCE(strImageTag)(IMAGE_SOURCE_URL_IMAGE))) = "ZIP" Then
-			' Create a temporary filename for the zip file
-			strLocalFile = strLocalPath & "\" & Win_GetBasename(Win_GetTempFilename())
-			boolZIP = True
-			LogMessage "Created temporary file for ZIP: " & strImageTag
-		Else
-			strLocalFile = strLocalPath & "\" & Win_GetBasename(Win_GetTempFilename())
-			boolZIP = False
-		End If
-		
-		' Download image file
-		ProgressEnable(BEnd_FMT(VBGT_Get("Downloading image '%x' data from the server. This takes a long time..."), Array(IMAGE_SOURCE(strImageTag)(IMAGE_SOURCE_LEGEND))))
-		boolResult = BEnd_DownloadImage(IMAGE_SOURCE(strImageTag)(IMAGE_SOURCE_URL_IMAGE), strLocalFile)
-		ProgressDisable
-		
-		If boolResult Then
-			AppendWriteStatus(VBGT_Get("Image data downloaded successfully"))
-
-			If IMAGE_SOURCE(strImageTag)(IMAGE_SOURCE_URL_MD5) <> "" Then
-				' The settings contain URL for the MD5 so we check the file integrity
-				
-				ProgressEnable(BEnd_FMT(VBGT_Get("Checking downloaded image '%x' data..."), Array(IMAGE_SOURCE(strImageTag)(IMAGE_SOURCE_LEGEND))))
-		
-				' Verify file MD5 to downloaded MD5
-				If BEnd_FileMD5IsEqual(strLocalFile, Win_ReadRegKeyHKCU(IMAGE_SOURCE(strImageTag)(IMAGE_SOURCE_MD5_REG_PATH), IMAGE_SOURCE(strImageTag)(IMAGE_SOURCE_MD5_LOCAL_REG_KEY))) Then
-					' Success
-					AppendWriteStatus(VBGT_Get("There are no errors in the image data."))
-					
-					If boolZIP Then
-						ProgressEnable(BEnd_FMT(VBGT_Get("Unpacking the image '%x' data..."), Array(IMAGE_SOURCE(strImageTag)(IMAGE_SOURCE_LEGEND))))
-
-						If not BEnd_Unbox("zip", strLocalFile, strLocalPath & "\" & Win_GetBasename(IMAGE_SOURCE(strImageTag)(IMAGE_SOURCE_LOCAL_PATH))) Then
-							ProgressDisable
-							AppendWriteStatus(VBGT_Get("Failed to unpack the image data."))
-							LogMessage("Image unboxing failed, error: " & BEnd_LastError)
-							MsgBox VBGT_Get("Failed to unpack the image data. Please download the image data again"), 16, VBGT_Get("Error")
-							
-							' Delete temporary folder
-							If not Win_DeleteFolder(strLocalPath) Then
-								LogMessage("Warning: Could not remove temporary folder " & strLocalPath)
-							End If
-							
-							Download = False
-							Exit Function
+				MsgBox VBGT_Get("Download complete.")
+			Else
+				' Failed to move all files. Return previous image files back to their places
+				For Each strThisImageTag in arrImageTags
+					If Win_FileExists(objTempFiles2(strThisImageTag)) Then
+						If not Win_MoveFile(objTempFiles2(strThisImageTag), IMAGE_SOURCE(strThisImageTag)(IMAGE_SOURCE_LOCAL_PATH)) Then
+							LogMessage "Failed to roll back old image file from " & objTempFiles2(strThisImageTag) & " to " & IMAGE_SOURCE(strThisImageTag)(IMAGE_SOURCE_LOCAL_PATH)
 						End If
-						
-						ProgressDisable
-						AppendWriteStatus(VBGT_Get("The downloaded image data has been unpacked."))
-						
-						' Before this strLocalFile points to downloaded zip
-						' After this it should point to extracted image file
-						strLocalFile = strLocalPath & "\" & Win_GetBasename(IMAGE_SOURCE(strImageTag)(IMAGE_SOURCE_LOCAL_PATH))
 					End If
-					
-					ProgressDisable
-					Download = True
-				Else
-					' Fail
-					AppendWriteStatus(VBGT_Get("There are errors in the downloaded image data."))
-					LogMessage("Image verify failed, error: " & BEnd_LastError)
-					MsgBox VBGT_Get("There are errors in the downloaded image data. Please download the image data again."), 16, VBGT_Get("Error")
-					' Delete failed temporary path
-					If not Win_DeleteFolder(strLocalPath) Then
-						LogMessage("Warning: Could not remove temporary folder " & strLocalPath)
-					End If
-					
-					ProgressDisable
-					Download = False
-					Exit Function
-				End If
-
+				Next
+				
 				ProgressDisable
-			Else
-				' There was no URL for the MD5 so we expect that the file is ok
-				Download = True
-			End If
-		Else
-			ProgressDisable
-			LogMessage("Image download failed, error: " & BEnd_LastError)
-			If BEnd_LastError = "CURL_ERROR_23" Then
-				AppendWriteStatus(VBGT_Get("The image data download failed: Disk Full"))
-				MsgBox VBGT_Get("The image data download failed: Disk Full"), 16, VBGT_Get("Error")
-			Else
-				AppendWriteStatus(VBGT_Get("The image data download failed."))
-				MsgBox VBGT_Get("The image data download failed."), 16, VBGT_Get("Error")
-			End If
-
-			' Delete failed temporary path & hash
-			If Win_FolderExists(strLocalPath) and not Win_DeleteFolder(strLocalPath) Then
-				LogMessage("Warning: Could not remove temporary folder " & strLocalPath)
-			End If
-			boolResult = Win_WriteRegKeyHKCU(IMAGE_SOURCE(strImageTag)(IMAGE_SOURCE_MD5_REG_PATH), IMAGE_SOURCE(strImageTag)(IMAGE_SOURCE_MD5_LOCAL_REG_KEY), "")
-
-			Download = False
-			Exit Function
-		End If
-		
-		ProgressDisable
-		
-		' The image is now in strLocalFile. As everything has gone well we can now replace the
-		' existing image file with the new one
-		ProgressEnable(VBGT_Get("Removing previous image file..."))
-		If Win_FileExists(IMAGE_SOURCE(strImageTag)(IMAGE_SOURCE_LOCAL_PATH)) and not Win_DeleteFile(IMAGE_SOURCE(strImageTag)(IMAGE_SOURCE_LOCAL_PATH)) Then
-			LogMessage("Warning: Could not remove previous image file " & IMAGE_SOURCE(strImageTag)(IMAGE_SOURCE_LOCAL_PATH))
-		End If
-		ProgressDisable
-		
-		ProgressEnable(VBGT_Get("Moving new image file to permanent location..."))
-			If not Win_MoveFile(strLocalFile, IMAGE_SOURCE(strImageTag)(IMAGE_SOURCE_LOCAL_PATH)) Then
 				MsgBox VBGT_Get("Failed to move new image file to permanent location. The image download failed."), 16, VBGT_Get("Error")
 			End If
-		ProgressDisable
+		Else
+			ProgressDisable
+			MsgBox VBGT_Get("The image data download failed."), 16, VBGT_Get("Error")
+		End If
 		
-		ProgressEnable(VBGT_Get("Removing temporary files..."))
-			If not Win_DeleteFolder(strLocalPath) Then
-				LogMessage("Warning: Could not remove temporary folder after successful download, folder: " & strLocalPath)
-			End If
-		ProgressDisable
-		
-		' Now we have successfully downloaded image
-		' Refresh the UI
 		PopulateUpdates
 		PopulateImages
 	End Function
 	
-    Sub AskImageFilePath
+    ' At the moment locally selectable images are not used
+	Sub AskImageFilePath
 		Dim strPath
 		
 		' Clear write status icon
