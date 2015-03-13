@@ -1,6 +1,6 @@
 # mebdd
 
-VBscript based frontend for `dd`, `unzip` and `curl` to easily create DigabiOS boot memory sticks.
+VBscript based frontend for `dd`, `unzip` and `curl` to easily create DigabiOS boot memory sticks. *This was a PoC of USB disk image download and write utility which later was implemented as [AbittiUSB](http://abitti.fi). This code is no longer updated.*
 
 ## Structure
 
